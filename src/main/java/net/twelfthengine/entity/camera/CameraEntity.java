@@ -1,51 +1,55 @@
 package net.twelfthengine.entity.camera;
 
-import net.twelfthengine.controls.InputManager;
 import net.twelfthengine.entity.BasicEntity;
-import net.twelfthengine.math.Vec3;
-import org.lwjgl.glfw.GLFW;
 
 public class CameraEntity extends BasicEntity {
 
-    private float pitch; // X Rotation
-    private float yaw;   // Y Rotation
-    private float roll;  // Z Rotation
+  private float pitch; // X Rotation
+  private float yaw; // Y Rotation
+  private float roll; // Z Rotation
 
-    private float cx;
-    private float cy;
-    private float cz;
+  private float cx;
+  private float cy;
+  private float cz;
 
-    public CameraEntity(float x, float y, float z) {
-        super(x, y, z);
-        cx = x;
-        cy = y;
-        cz = z;
-        this.pitch = 0;
-        this.yaw = 0;
-        this.roll = 0;
-        this.setGravityEnabled(false); // Kamera nicht von Gravity betroffen
-    }
+  public CameraEntity(float x, float y, float z) {
+    super(x, y, z);
+    cx = x;
+    cy = y;
+    cz = z;
+    this.pitch = 0;
+    this.yaw = 0;
+    this.roll = 0;
+    this.setGravityEnabled(false); // Kamera nicht von Gravity betroffen
+  }
 
-    // Rotationen
-    public void setRotation(float pitch, float yaw, float roll) {
-        this.yaw = yaw;
-        this.roll = roll;
+  // Rotationen
+  public void setRotation(float pitch, float yaw, float roll) {
+    this.yaw = yaw;
+    this.roll = roll;
 
-        this.pitch = Math.max(-90, Math.min(90, pitch));
-    }
+    this.pitch = Math.max(-90, Math.min(90, pitch));
+  }
 
-    public float getPitch() { return pitch; }
-    public float getYaw() { return yaw; }
-    public float getRoll() { return roll; }
+  public float getPitch() {
+    return pitch;
+  }
 
-    @Override
-    public void update(float deltaTime) {
-        super.update(deltaTime);
-    }
+  public float getYaw() {
+    return yaw;
+  }
 
-    @Override
-    public boolean isRigidBodyEnabled() {
-        return true;
-    }
+  public float getRoll() {
+    return roll;
+  }
 
+  @Override
+  public void update(float deltaTime) {
+    super.update(deltaTime);
+  }
+
+  @Override
+  public boolean isRigidBodyEnabled() {
+    return true;
+  }
 }

@@ -1,4 +1,3 @@
 package net.twelfthengine.controls;
 
-public class MouseState {
-}
+public class MouseState {}

@@ -4,115 +4,113 @@ import net.twelfthengine.entity.BasicEntity;
 import net.twelfthengine.math.Vec3;
 
 /**
- * World light with optional shadow mapping. Direction follows yaw (Y) and pitch (X), same convention as the player camera.
+ * World light with optional shadow mapping. Direction follows yaw (Y) and pitch (X), same
+ * convention as the player camera.
  */
 public class LightEntity extends BasicEntity {
 
-    private float yaw;
-    private float pitch;
-    private float roll;
+  private float yaw;
+  private float pitch;
+  private float roll;
 
-    private Vec3 color = new Vec3(1f, 0.98f, 0.92f);
-    private float intensity = 1.2f;
-    private boolean castShadows = true;
+  private Vec3 color = new Vec3(1f, 0.98f, 0.92f);
+  private float intensity = 1.2f;
+  private boolean castShadows = true;
 
-    /** Orthographic half-extent for the shadow frustum (world units). */
-    private float shadowOrthoHalfSize = 42f;
-    private float shadowNear = 0.5f;
-    private float shadowFar = 160f;
+  /** Orthographic half-extent for the shadow frustum (world units). */
+  private float shadowOrthoHalfSize = 42f;
 
-    public LightEntity(float x, float y, float z) {
-        super(x, y, z);
-        setGravityEnabled(false);
-        setRigidBodyEnabled(false);
-    }
+  private float shadowNear = 0.5f;
+  private float shadowFar = 160f;
 
-    public void setRotation(float pitch, float yaw, float roll) {
-        this.pitch = Math.max(-89f, Math.min(89f, pitch));
-        this.yaw = yaw;
-        this.roll = roll;
-    }
+  public LightEntity(float x, float y, float z) {
+    super(x, y, z);
+    setGravityEnabled(false);
+    setRigidBodyEnabled(false);
+  }
 
-    public float getPitch() {
-        return pitch;
-    }
+  public void setRotation(float pitch, float yaw, float roll) {
+    this.pitch = Math.max(-89f, Math.min(89f, pitch));
+    this.yaw = yaw;
+    this.roll = roll;
+  }
 
-    public float getYaw() {
-        return yaw;
-    }
+  public float getPitch() {
+    return pitch;
+  }
 
-    public float getRoll() {
-        return roll;
-    }
+  public float getYaw() {
+    return yaw;
+  }
 
-    /**
-     * Normalized direction the light shines (into the scene), in world space.
-     */
-    public Vec3 getForwardDirection() {
-        float yr = (float) Math.toRadians(yaw);
-        float pr = (float) Math.toRadians(pitch);
-        float x = (float) (Math.cos(pr) * Math.sin(yr));
-        float y = (float) (-Math.sin(pr));
-        float z = (float) (-Math.cos(pr) * Math.cos(yr));
-        return new Vec3(x, y, z).normalize();
-    }
+  public float getRoll() {
+    return roll;
+  }
 
-    /**
-     * Direction from a surface point toward this light (for diffuse / shadow bias).
-     */
-    public Vec3 getDirectionToLightWorld() {
-        return getForwardDirection().mul(-1f).normalize();
-    }
+  /** Normalized direction the light shines (into the scene), in world space. */
+  public Vec3 getForwardDirection() {
+    float yr = (float) Math.toRadians(yaw);
+    float pr = (float) Math.toRadians(pitch);
+    float x = (float) (Math.cos(pr) * Math.sin(yr));
+    float y = (float) (-Math.sin(pr));
+    float z = (float) (-Math.cos(pr) * Math.cos(yr));
+    return new Vec3(x, y, z).normalize();
+  }
 
-    public Vec3 getColor() {
-        return color;
-    }
+  /** Direction from a surface point toward this light (for diffuse / shadow bias). */
+  public Vec3 getDirectionToLightWorld() {
+    return getForwardDirection().mul(-1f).normalize();
+  }
 
-    public void setColor(Vec3 color) {
-        this.color = color;
-    }
+  public Vec3 getColor() {
+    return color;
+  }
 
-    public void setColor(float r, float g, float b) {
-        this.color = new Vec3(r, g, b);
-    }
+  public void setColor(Vec3 color) {
+    this.color = color;
+  }
 
-    public float getIntensity() {
-        return intensity;
-    }
+  public void setColor(float r, float g, float b) {
+    this.color = new Vec3(r, g, b);
+  }
 
-    public void setIntensity(float intensity) {
-        this.intensity = intensity;
-    }
+  public float getIntensity() {
+    return intensity;
+  }
 
-    public boolean isCastShadows() {
-        return castShadows;
-    }
+  public void setIntensity(float intensity) {
+    this.intensity = intensity;
+  }
 
-    public void setCastShadows(boolean castShadows) {
-        this.castShadows = castShadows;
-    }
+  public boolean isCastShadows() {
+    return castShadows;
+  }
 
-    public float getShadowOrthoHalfSize() {
-        return shadowOrthoHalfSize;
-    }
+  public void setCastShadows(boolean castShadows) {
+    this.castShadows = castShadows;
+  }
 
-    public void setShadowOrthoHalfSize(float shadowOrthoHalfSize) {
-        this.shadowOrthoHalfSize = shadowOrthoHalfSize;
-    }
+  public float getShadowOrthoHalfSize() {
+    return shadowOrthoHalfSize;
+  }
 
-    public float getShadowNear() {
-        return shadowNear;
-    }
+  public void setShadowOrthoHalfSize(float shadowOrthoHalfSize) {
+    this.shadowOrthoHalfSize = shadowOrthoHalfSize;
+  }
 
-    public void setShadowNear(float shadowNear) {
-        this.shadowNear = shadowNear;
-    }
+  public float getShadowNear() {
+    return shadowNear;
+  }
 
-    public float getShadowFar() {
-        return shadowFar;
-    }
+  public void setShadowNear(float shadowNear) {
+    this.shadowNear = shadowNear;
+  }
 
-    public void setShadowFar(float shadowFar) {
-        this.shadowFar = shadowFar;
-    }
+  public float getShadowFar() {
+    return shadowFar;
+  }
+
+  public void setShadowFar(float shadowFar) {
+    this.shadowFar = shadowFar;
+  }
 }

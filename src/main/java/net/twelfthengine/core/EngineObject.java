@@ -6,67 +6,65 @@ import net.twelfthengine.world.World;
 
 public final class EngineObject {
 
-    private static EngineObject instance;
+  private static EngineObject instance;
 
-    private boolean running = false;
+  private boolean running = false;
 
-    private EngineObject() {
+  private EngineObject() {}
+
+  public static EngineObject getInstance() {
+    if (instance == null) {
+      instance = new EngineObject();
     }
+    return instance;
+  }
 
-    public static EngineObject getInstance() {
-        if (instance == null) {
-            instance = new EngineObject();
-        }
-        return instance;
-    }
+  // =========================
+  // WORLD
+  // =========================
 
-    // =========================
-    // WORLD
-    // =========================
+  private World world;
 
-    private World world;
+  public void setWorld(World world) {
+    this.world = world;
+  }
 
-    public void setWorld(World world) {
-        this.world = world;
-    }
+  public World getWorld() {
+    if (world == null) throw new IllegalStateException("World (IAB) not set!");
+    return world;
+  }
 
-    public World getWorld() {
-        if (world == null)
-            throw new IllegalStateException("World (IAB) not set!");
-        return world;
-    }
+  public boolean hasWorld() {
+    return world != null;
+  }
 
-    public boolean hasWorld() {
-        return world != null;
-    }
+  // =========================
+  // TICKS
+  // =========================
 
-    // =========================
-    // TICKS
-    // =========================
+  private final TickManager tickManager = new TickManager();
 
-    private final TickManager tickManager = new TickManager();
+  public TickManager getTickManager() {
+    return tickManager;
+  }
 
-    public TickManager getTickManager() {
-        return tickManager;
-    }
+  // =========================
+  // LIFECYCLE
+  // =========================
 
-    // =========================
-    // LIFECYCLE
-    // =========================
+  public void start() {
+    if (running) return;
+    running = true;
+    Logger.info("12th Engine", "Engine started");
+  }
 
-    public void start() {
-        if (running) return;
-        running = true;
-        Logger.info("12th Engine", "Engine started");
-    }
+  public void stop() {
+    if (!running) return;
+    running = false;
+    Logger.info("12th Engine", "Engine stopped");
+  }
 
-    public void stop() {
-        if (!running) return;
-        running = false;
-        Logger.info("12th Engine", "Engine stopped");
-    }
-
-    public boolean isRunning() {
-        return running;
-    }
+  public boolean isRunning() {
+    return running;
+  }
 }
