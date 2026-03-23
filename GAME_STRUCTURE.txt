@@ -1,0 +1,154 @@
+├── 📁 Game Code Structure
+│
+├── `GameManager.java` - Main game controller
+│   ├─ Level loading and progression
+│   ├─ Game state management
+│   ├─ Objective tracking (hit detection)
+│   └─ Three pre-built puzzle levels
+│
+├── `PushableEntity.java` - Physics blocks
+│   ├─ Extends BasicEntity with physics
+│   ├─ Configurable mass and drag
+│   ├─ Gravity and momentum
+│   └─ Push interaction support
+│
+├── `TargetEntity.java` - Goal spheres
+│   ├─ Non-physics objects
+│   ├─ Hit state tracking
+│   ├─ Visual hit feedback
+│   └─ Level completion detection
+│
+├── `InteractionSystem.java` - Player interaction
+│   ├─ Proximity-based pushing
+│   ├─ Push force application
+│   ├─ Collision detection between objects
+│   └─ Target hit callbacks
+│
+└── `GameHUD.java` - UI/Status display
+    ├─ Level information display
+    ├─ Objective counter
+    ├─ Status messages
+    └─ Game instructions
+
+═══════════════════════════════════════════════════════════════
+
+🎯 QUICK START GUIDE
+
+1. OPEN THE PROJECT
+   - Open 12th-Engine folder in VS Code
+   - Java and LWJGL dependencies are configured in build.gradle.kts
+
+2. BUILD THE PROJECT
+   PowerShell:
+   ```
+   .\gradlew build
+   ```
+   
+3. RUN THE GAME
+   PowerShell:
+   ```
+   .\gradlew run
+   ```
+   
+4. PLAY THE GAME
+   Level 1: Single target, 2 blocks (Easy)
+   - Push the blocks to hit the target sphere
+   - Use WASD to move camera, mouse to look around
+   
+   Level 2: Two targets, more obstacles (Medium)
+   - Take your time positioning blocks
+   - Watch out for walls
+   
+   Level 3: Hard challenge (Hard)
+   - Multiple blocks at different heights
+   - Complex spatial puzzle
+   
+   Controls:
+   - W/A/S/D: Move camera
+   - Mouse: Look around
+   - R: Restart level
+   - N: Next level (when complete)
+
+═══════════════════════════════════════════════════════════════
+
+💡 KEY FEATURES
+
+✨ 3D Physics-Based Gameplay
+   - Real gravity and momentum
+   - Configurable object mass and drag
+   - Force-based interactions
+
+🎮 Progressive Difficulty
+   - Level 1: Learn the mechanics
+   - Level 2: Solve multi-target puzzle
+   - Level 3: Master the physics
+
+🔧 Extensible Game Systems
+   - GameManager: Easy to add more levels
+   - InteractionSystem: Can extend interaction types
+   - Entity-based: Simple to add new object types
+
+═══════════════════════════════════════════════════════════════
+
+🚀 HOW TO EXTEND THE GAME
+
+ADD A NEW LEVEL:
+1. Open GameManager.java
+2. Add a new loadLevel() case:
+   ```java
+   case 4:
+       loadLevel4();
+       break;
+   ```
+3. Create loadLevel4() method with:
+   - Ground setup (call setupGround())
+   - Target entities
+   - Pushable blocks
+   - Obstacles
+
+ADD NEW ENTITY TYPE:
+1. Create class extending BasicEntity
+2. Implement physics/behavior
+3. Add rendering logic to Renderer3D
+
+MODIFY PHYSICS:
+1. Adjust gravity: Change in BasicEntity constructor
+2. Adjust push force: Change in InteractionSystem
+3. Modify object properties: Use setMass(), setDrag()
+
+═══════════════════════════════════════════════════════════════
+
+📊 GAME STATISTICS
+
+Levels Included: 3
+Entities Per Level: 4-8
+Physics Objects: PushableEntity (configurable)
+Static Objects: TargetEntity, BasicPlaneEntity
+Camera Type: First-Person (PlayerCameraEntity)
+Rendering: 3D OpenGL with lighting
+
+═══════════════════════════════════════════════════════════════
+
+🎯 OBJECTIVES BREAKDOWN
+
+Level 1: Simple Introduction
+├─ Objectives: Hit 1 target
+├─ Objects: 2 pushable blocks
+├─ Obstacles: None
+└─ Estimated Time: 1-2 minutes
+
+Level 2: Multi-Target Puzzle
+├─ Objectives: Hit 2 targets
+├─ Objects: 2 pushable blocks
+├─ Obstacles: Wall obstruction
+└─ Estimated Time: 3-5 minutes
+
+Level 3: Advanced Challenge
+├─ Objectives: Hit 1 difficult target
+├─ Objects: 4 pushable blocks
+├─ Obstacles: Multiple walls and platforms
+└─ Estimated Time: 5-10 minutes
+
+═══════════════════════════════════════════════════════════════
+
+Enjoy your Physics Puzzle Game! 🎮✨
