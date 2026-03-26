@@ -1,18 +1,32 @@
 package net.twelfthengine.renderer.obj;
 
 import java.io.*;
+import net.twelfthengine.core.resources.TwelfthPackage;
 import net.twelfthengine.math.Vec2f;
 import net.twelfthengine.math.Vec3;
 
 public class ObjLoader {
-  public static ObjModel load(String resourcePath) throws IOException {
-    ObjModel model = new ObjModel();
 
-    // Lade die Datei als Stream aus den Resources
+  public static ObjModel load(String resourcePath) throws IOException {
     InputStream in = ObjLoader.class.getResourceAsStream(resourcePath);
     if (in == null) {
       throw new IOException("Resource nicht gefunden: " + resourcePath);
     }
+    return loadFromStream(in, resourcePath, null);
+  }
+
+  public static ObjModel loadFromPackage(TwelfthPackage twmPack, String objFileName)
+      throws IOException {
+    InputStream in = twmPack.getFileInputStream(objFileName);
+    if (in == null) {
+      throw new IOException("OBJ file not found in package: " + objFileName);
+    }
+    return loadFromStream(in, objFileName, twmPack);
+  }
+
+  private static ObjModel loadFromStream(
+      InputStream in, String resourcePath, TwelfthPackage twmPack) throws IOException {
+    ObjModel model = new ObjModel();
 
     BufferedReader reader = new BufferedReader(new InputStreamReader(in));
     String currentMaterial = "default";
@@ -45,7 +59,11 @@ public class ObjLoader {
           int lastSlash = resourcePath.lastIndexOf('/');
           if (lastSlash != -1) folder = resourcePath.substring(0, lastSlash + 1);
 
-          MtlLoader.load(folder + tokens[1], model);
+          if (twmPack != null) {
+            MtlLoader.loadFromPackage(folder + tokens[1], model, twmPack);
+          } else {
+            MtlLoader.load(folder + tokens[1], model);
+          }
           break;
         case "usemtl":
           currentMaterial = tokens[1];

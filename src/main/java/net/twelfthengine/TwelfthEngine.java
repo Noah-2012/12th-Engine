@@ -4,15 +4,20 @@ import java.util.Locale;
 import net.twelfthengine.controls.InputManager;
 import net.twelfthengine.coord.iab.IAB;
 import net.twelfthengine.core.EngineObject;
+import net.twelfthengine.core.debug.CullingDebugWindow;
 import net.twelfthengine.core.logger.Logger;
+import net.twelfthengine.core.resources.*;
+import net.twelfthengine.core.resources.TwelfthPackage;
 import net.twelfthengine.core.tick.TickManager;
 import net.twelfthengine.core.tick.TickPhase;
 import net.twelfthengine.core.tick.TickProfiler;
+import net.twelfthengine.entity.BasicEntity;
 import net.twelfthengine.entity.ModelEntity;
 import net.twelfthengine.entity.camera.CameraEntity;
 import net.twelfthengine.entity.camera.PlayerCameraEntity;
 import net.twelfthengine.entity.world.BasicPlaneEntity;
 import net.twelfthengine.entity.world.LightEntity;
+import net.twelfthengine.entity.world.TextureEntity;
 import net.twelfthengine.gui.PauseMenuScreen;
 import net.twelfthengine.math.Vec3;
 import net.twelfthengine.renderer.Renderer2D;
@@ -27,6 +32,7 @@ import net.twelfthengine.world.World;
 import org.lwjgl.glfw.GLFW;
 
 public class TwelfthEngine {
+
   private static final double TICK_RATE = 20.0;
   private static final double TICK_TIME = 1.0 / TICK_RATE;
   private static int TICK_COUNTER = 0;
@@ -35,8 +41,9 @@ public class TwelfthEngine {
   private static volatile boolean SIMULATE_LAG = false;
   private static final int LAG_DELAY_MS = 200;
 
-  public static void main(String[] args) {
+  private static final boolean ENABLE_CULLING_DEBUG = false;
 
+  public static void main(String[] args) {
     EngineObject engine = EngineObject.getInstance();
     engine.start();
     Logger.info("Startup", "Starting EngineObject");
@@ -57,6 +64,20 @@ public class TwelfthEngine {
     RenderPipeline renderPipeline = new RenderPipeline();
     r3d.setFovDegrees(95f);
 
+    Window debugWindow = null;
+    Renderer2D debugRenderer = null;
+    Renderer3D debugR3d = null;
+
+    if (ENABLE_CULLING_DEBUG) {
+      debugWindow = new Window(1, 800, 800, "Top-Down View");
+      debugWindow.init(window.getHandle());
+      GLFW.glfwMakeContextCurrent(debugWindow.getHandle());
+      debugRenderer = new Renderer2D(debugWindow);
+      debugR3d = new Renderer3D(800, 800);
+      debugR3d.setFovDegrees(90f);
+      GLFW.glfwMakeContextCurrent(window.getHandle());
+    }
+
     CameraEntity cam = new PlayerCameraEntity(0f, 5f, 5f);
     cam.setPosition(new Vec3(0, 5, 0));
     cam.setRotation(0, 0, 0);
@@ -68,8 +89,37 @@ public class TwelfthEngine {
     world.setActiveCamera(cam);
     Logger.info("Startup", "Creating new World with new IAB");
 
+    CullingDebugWindow cullingDebugWindow = null;
+    CameraEntity topDownCam = null;
+
+    if (ENABLE_CULLING_DEBUG) {
+      cullingDebugWindow = new CullingDebugWindow(world);
+
+      topDownCam =
+          new CameraEntity(0f, 200f, 0f) {
+            @Override
+            public void update(float deltaTime) {
+              Vec3 p = cam.getPosition();
+              setPosition(new Vec3(p.x(), 200f, p.z()));
+              setRotation(90f, 0f, 0f);
+            }
+          };
+      topDownCam.setRigidBodyEnabled(false);
+      topDownCam.setGravityEnabled(false);
+      topDownCam.setCollidable(false);
+      world.addEntity(topDownCam);
+    }
+
     r3d.setAntialiasing(true);
     r3d.setMultisampling(true);
+
+    if (ENABLE_CULLING_DEBUG) {
+      GLFW.glfwMakeContextCurrent(debugWindow.getHandle());
+      debugR3d.setAntialiasing(true);
+      debugR3d.setMultisampling(true);
+      debugR3d.setFrustumCullingEnabled(false);
+      GLFW.glfwMakeContextCurrent(window.getHandle());
+    }
 
     world.addEntity(new BasicPlaneEntity(0, -3, 0, 50, 50));
 
@@ -85,7 +135,6 @@ public class TwelfthEngine {
 
     Logger.showConsole();
 
-    // Your existing initialization code...
     Logger.info("Startup", "Starting 12th Engine v1.0");
 
     // --- OBJ ENTITY SETUP ---
@@ -95,9 +144,27 @@ public class TwelfthEngine {
     ModelEntity treeEntity3 = new ModelEntity(6, -2, 0, "/models/tree/Tree.obj");
     ModelEntity treeEntity4 = new ModelEntity(9, -2, 0, "/models/tree/Tree.obj");
     */
-    ModelEntity bombEntity = new ModelEntity(-6, 600, 0, "/models/6ovcmof8fc56.obj");
-    ModelEntity bombEntity2 = new ModelEntity(-8, 500, 0, "/models/6ovcmof8fc56.obj");
-    ModelEntity bombEntity3 = new ModelEntity(-10, 400, 0, "/models/6ovcmof8fc56.obj");
+
+    ModelEntity bombEntity = null;
+    try {
+      TwelfthPackage assetArchive =
+          new TwelfthPackage("src/main/resources/models/6ovcmof8fc56.twa");
+
+      // 2. Extract the Model Archive (.twm) as raw bytes
+      byte[] twmBytes = assetArchive.getFileData("6ovcmof8fc56.twm");
+
+      // 3. Mount the nested .twm into memory (which automatically decrypts the XOR obfuscation!)
+      TwelfthPackage modelArchive = new TwelfthPackage(twmBytes, "6ovcmof8fc56.twm");
+
+      // 4. Create the ModelEntity completely out of the obfuscated archive in memory
+      bombEntity = new ModelEntity(-6, 600, 0, "6ovcmof8fc56.obj", modelArchive);
+    } catch (java.io.IOException e) {
+      System.err.println("Failed to load packaged model!");
+      e.printStackTrace();
+    }
+
+    TextureEntity treeSprite =
+        new TextureEntity(-10, 2, 0, "/models/tree/DB2X2_L01.png", 2.0f, 4.0f);
 
     // Set sizes
     /*
@@ -107,25 +174,21 @@ public class TwelfthEngine {
     treeEntity4.setSize(1.0f);
 
      */
-    bombEntity.setSize(1.0f);
-    bombEntity2.setSize(1.0f);
-    bombEntity3.setSize(1.0f);
+    if (bombEntity != null) {
+      bombEntity.setSize(1.0f);
 
-    // Enable physics for bomb
-    bombEntity.enableRigidbody();
-    bombEntity.setMass(1.0f);
-    bombEntity.setDrag(0.999f);
-    bombEntity.setGravity(19.62f);
+      // Enable physics for bomb
+      bombEntity.enableRigidbody();
+      bombEntity.setMass(1.0f);
+      bombEntity.setDrag(0.999f);
+      bombEntity.setGravity(19.62f);
+      bombEntity.setRotation(new Vec3(0, 45, 0));
+      bombEntity.setCollisionShape(BasicEntity.CollisionShape.AABB);
+      bombEntity.setPushable(true);
+      bombEntity.setCollidable(true);
 
-    bombEntity2.enableRigidbody();
-    bombEntity2.setMass(1.0f);
-    bombEntity2.setDrag(0.999f);
-    bombEntity2.setGravity(19.62f);
-
-    bombEntity3.enableRigidbody();
-    bombEntity3.setMass(1.0f);
-    bombEntity3.setDrag(0.999f);
-    bombEntity3.setGravity(19.62f);
+      world.addEntity(bombEntity);
+    }
 
     // Add entities to world
     /*
@@ -135,15 +198,48 @@ public class TwelfthEngine {
     world.addEntity(treeEntity4);
 
      */
-    world.addEntity(bombEntity);
-    world.addEntity(bombEntity2);
-    world.addEntity(bombEntity3);
+    world.addEntity(treeSprite);
 
     // --- Render pipeline setup ---
+    final Renderer3D finalDebugR3d = debugR3d;
     renderPipeline.addStep(
         RenderLayer.OPAQUE_3D,
         ctx -> {
-          ctx.renderer3D().render(ctx.world());
+          if (ENABLE_CULLING_DEBUG && ctx.renderer3D() == finalDebugR3d) {
+            java.util.List<BasicEntity> hidden = new java.util.ArrayList<>();
+            java.util.List<Vec3> oldPositions = new java.util.ArrayList<>();
+            org.joml.FrustumIntersection f = r3d.getFrustum();
+
+            for (BasicEntity e : ctx.world().getEntities()) {
+              if (e instanceof CameraEntity
+                  || e instanceof net.twelfthengine.entity.world.LightEntity) continue;
+
+              float radius = e.getCollisionRadius();
+              if (e instanceof ModelEntity me) radius = me.getModelBoundingRadius() * me.getSize();
+              else if (e instanceof BasicPlaneEntity plane)
+                radius = Math.max(plane.getWidth(), plane.getLength());
+              else if (e instanceof net.twelfthengine.entity.world.TextureEntity te)
+                radius = Math.max(te.getWidth(), te.getHeight());
+
+              if (f != null
+                  && !f.testSphere(
+                      e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
+                hidden.add(e);
+                oldPositions.add(e.getPosition());
+                // Move far out of bounds so it doesn't render in the debug view
+                e.setPosition(new Vec3(100000f, 100000f, 100000f));
+              }
+            }
+
+            ctx.renderer3D().render(ctx.world());
+
+            // Restore actual positions
+            for (int i = 0; i < hidden.size(); i++) {
+              hidden.get(i).setPosition(oldPositions.get(i));
+            }
+          } else {
+            ctx.renderer3D().render(ctx.world());
+          }
         });
     renderPipeline.addStep(
         RenderLayer.DEBUG_3D,
@@ -153,6 +249,50 @@ public class TwelfthEngine {
 
           ctx.renderer3D().setColor(0, 0, 1, 1);
           ctx.renderer3D().drawFilledBox(new Vec3(5, 5, 5), new Vec3(3, 3, 3));
+
+          if (ENABLE_CULLING_DEBUG && ctx.renderer3D() == finalDebugR3d) {
+            ctx.renderer3D().setColor(1f, 1f, 0f, 1f);
+            org.joml.Matrix4f view =
+                new org.joml.Matrix4f()
+                    .rotateX((float) Math.toRadians(cam.getPitch()))
+                    .rotateY((float) Math.toRadians(cam.getYaw()))
+                    .rotateZ((float) Math.toRadians(cam.getRoll()))
+                    .translate(
+                        -cam.getPosition().x(), -cam.getPosition().y(), -cam.getPosition().z());
+
+            org.joml.Matrix4f proj =
+                new org.joml.Matrix4f()
+                    .perspective((float) Math.toRadians(95f), 1920f / 1080f, 0.1f, 1000f);
+
+            org.joml.Matrix4f invProjView = new org.joml.Matrix4f(proj).mul(view).invert();
+
+            Vec3[] corners = new Vec3[8];
+            int i = 0;
+            for (int x = -1; x <= 1; x += 2) {
+              for (int y = -1; y <= 1; y += 2) {
+                for (int z = -1; z <= 1; z += 2) {
+                  org.joml.Vector4f v = new org.joml.Vector4f(x, y, z, 1.0f);
+                  v.mul(invProjView);
+                  corners[i++] = new Vec3(v.x / v.w, v.y / v.w, v.z / v.w);
+                }
+              }
+            }
+
+            ctx.renderer3D().drawLine(corners[0], corners[2]);
+            ctx.renderer3D().drawLine(corners[2], corners[6]);
+            ctx.renderer3D().drawLine(corners[6], corners[4]);
+            ctx.renderer3D().drawLine(corners[4], corners[0]);
+
+            ctx.renderer3D().drawLine(corners[1], corners[3]);
+            ctx.renderer3D().drawLine(corners[3], corners[7]);
+            ctx.renderer3D().drawLine(corners[7], corners[5]);
+            ctx.renderer3D().drawLine(corners[5], corners[1]);
+
+            ctx.renderer3D().drawLine(corners[0], corners[1]);
+            ctx.renderer3D().drawLine(corners[2], corners[3]);
+            ctx.renderer3D().drawLine(corners[4], corners[5]);
+            ctx.renderer3D().drawLine(corners[6], corners[7]);
+          }
         });
     final boolean[] showDebugOverlay = {false};
     final int graphSamples = 100;
@@ -168,8 +308,8 @@ public class TwelfthEngine {
     renderPipeline.addStep(
         RenderLayer.UI_2D,
         ctx -> {
-          int sw = window.getWidth();
-          int sh = window.getHeight();
+          int sw = ctx.window().getWidth();
+          int sh = ctx.window().getHeight();
           int centerX = sw / 2;
           int centerY = sh / 2;
           int size = 8;
@@ -178,12 +318,12 @@ public class TwelfthEngine {
           String tickText = "Ticks: " + TICK_COUNTER;
 
           if (paused[0]) {
-            pauseMenu.captureBackdrop(window);
+            pauseMenu.captureBackdrop(ctx.window());
             pauseMenu.layout(sw, sh);
             pauseMenu.drawBackdropBlurAndDim(ctx.renderer2D(), sw, sh);
             double mx = InputManager.getMouseX();
             double my = InputManager.getMouseY();
-            pauseMenu.drawButtons(window, ctx.renderer2D(), textRenderer, mx, my);
+            pauseMenu.drawButtons(ctx.window(), ctx.renderer2D(), textRenderer, mx, my);
           } else {
             ctx.renderer2D().setColor(1f, 1f, 1f, 1f);
             ctx.renderer2D().drawLine(centerX - size, centerY, centerX + size, centerY);
@@ -286,15 +426,15 @@ public class TwelfthEngine {
 
               int fps1 = Math.min(maxFpsScale, fpsHistory[idxA]);
               int fps2 = Math.min(maxFpsScale, fpsHistory[idxB]);
-              int yFps1 = graphY + graphH - (fps1 * graphH / maxFpsScale);
-              int yFps2 = graphY + graphH - (fps2 * graphH / maxFpsScale);
+              int yFps1 = graphY + graphH - ((fps1 * graphH) / maxFpsScale);
+              int yFps2 = graphY + graphH - ((fps2 * graphH) / maxFpsScale);
               ctx.renderer2D().setColor(0.2f, 0.75f, 1f, 1f);
               ctx.renderer2D().drawLine(x1, yFps1, x2, yFps2);
 
               int tps1 = Math.min(maxTpsScale, tpsHistory[idxA]);
               int tps2 = Math.min(maxTpsScale, tpsHistory[idxB]);
-              int yTps1 = graphY + graphH - (tps1 * graphH / maxTpsScale);
-              int yTps2 = graphY + graphH - (tps2 * graphH / maxTpsScale);
+              int yTps1 = graphY + graphH - ((tps1 * graphH) / maxTpsScale);
+              int yTps2 = graphY + graphH - ((tps2 * graphH) / maxTpsScale);
               ctx.renderer2D().setColor(0.35f, 1f, 0.35f, 1f);
               ctx.renderer2D().drawLine(x1, yTps1, x2, yTps2);
             }
@@ -311,57 +451,49 @@ public class TwelfthEngine {
           }
         });
 
-    new Thread(
-            () -> {
-              long lastTickTime = System.nanoTime();
-              long tpsWindowStart = System.nanoTime();
-              int ticksInWindow = 0;
-              TickProfiler profiler = new TickProfiler(TICK_RATE);
+    long lastTime = System.nanoTime();
+    long tpsWindowStart = System.nanoTime();
+    int ticksInWindow = 0;
+    TickProfiler profiler = new TickProfiler(TICK_RATE);
+    double accumulator = 0.0;
 
-              while (EngineObject.getInstance().isRunning()) {
-                long now = System.nanoTime();
-                double elapsed = (now - lastTickTime) / 1_000_000_000.0;
-
-                if (elapsed >= TICK_TIME) {
-                  if (SIMULATE_LAG) {
-                    try {
-                      Thread.sleep(LAG_DELAY_MS);
-                    } catch (InterruptedException e) {
-                      Thread.currentThread().interrupt();
-                    }
-                  }
-                  TICK_COUNTER++;
-                  ticksInWindow++;
-                  profiler.startTick();
-                  tickManager.fire(TickPhase.PRE, TICK_TIME);
-                  Vec3 toLight = mainLight.getDirectionToLightWorld();
-                  System.out.println(
-                      "LightDir: " + toLight.x() + " " + toLight.y() + " " + toLight.z());
-                  tickManager.fire(TickPhase.POST, TICK_TIME);
-                  profiler.endTick();
-                  lastTickTime = now;
-                }
-
-                double tpsWindowElapsed = (now - tpsWindowStart) / 1_000_000_000.0;
-                if (tpsWindowElapsed >= 1.0) {
-                  CURRENT_TPS = ticksInWindow;
-                  ticksInWindow = 0;
-                  tpsWindowStart = now;
-                }
-                profiler.update();
-              }
-            })
-        .start();
-
-    long lastFrameTime = System.nanoTime();
     long fpsWindowStart = System.nanoTime();
     int framesInWindow = 0;
 
-    while (!window.shouldClose()) {
+    while (!window.shouldClose() && EngineObject.getInstance().isRunning()) {
       long currentTime = System.nanoTime();
-      float deltaTime = (currentTime - lastFrameTime) / 1_000_000_000f;
-      lastFrameTime = currentTime;
+      float deltaTime = (currentTime - lastTime) / 1_000_000_000f;
+      lastTime = currentTime;
       framesInWindow++;
+
+      accumulator += deltaTime;
+
+      while (accumulator >= TICK_TIME) {
+        if (SIMULATE_LAG) {
+          try {
+            Thread.sleep(LAG_DELAY_MS);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        }
+        TICK_COUNTER++;
+        ticksInWindow++;
+        profiler.startTick();
+        tickManager.fire(TickPhase.PRE, TICK_TIME);
+        Vec3 toLight = mainLight.getDirectionToLightWorld();
+        System.out.println("LightDir: " + toLight.x() + " " + toLight.y() + " " + toLight.z());
+        tickManager.fire(TickPhase.POST, TICK_TIME);
+        profiler.endTick();
+        accumulator -= TICK_TIME;
+      }
+
+      double tpsWindowElapsed = (currentTime - tpsWindowStart) / 1_000_000_000.0;
+      if (tpsWindowElapsed >= 1.0) {
+        CURRENT_TPS = ticksInWindow;
+        ticksInWindow = 0;
+        tpsWindowStart = currentTime;
+      }
+      profiler.update();
 
       GLFW.glfwPollEvents();
       InputManager.update();
@@ -415,14 +547,34 @@ public class TwelfthEngine {
         lastGraphSampleNano[0] = currentTime;
       }
 
+      engine.getWorld().setActiveCamera(cam);
       if (!paused[0]) {
         engine.getWorld().update(deltaTime);
       }
+
+      GLFW.glfwMakeContextCurrent(window.getHandle());
       renderPipeline.renderFrame(new RenderContext(window, engine.getWorld(), renderer, r3d));
       window.update();
+
+      if (ENABLE_CULLING_DEBUG) {
+        if (!debugWindow.shouldClose()) {
+          GLFW.glfwMakeContextCurrent(debugWindow.getHandle());
+          engine.getWorld().setActiveCamera(topDownCam);
+          renderPipeline.renderFrame(
+              new RenderContext(debugWindow, engine.getWorld(), debugRenderer, finalDebugR3d));
+          debugWindow.update();
+        }
+
+        if (cullingDebugWindow != null) {
+          cullingDebugWindow.update(r3d.getFrustum());
+        }
+      }
     }
 
     pauseMenu.dispose();
+    if (ENABLE_CULLING_DEBUG && debugWindow != null) {
+      debugWindow.close();
+    }
     window.close();
     engine.stop();
     Logger.info("Window", "Window closed, Engine continues running!");

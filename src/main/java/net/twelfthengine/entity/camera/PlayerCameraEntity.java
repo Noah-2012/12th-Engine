@@ -13,10 +13,11 @@ public class PlayerCameraEntity extends CameraEntity {
 
   private boolean isGrounded = false;
   private boolean wantsToJump = false;
-  private float jumpStrength = 5.5f;
-  private float moveSpeed = 2.2f;
-  private float sprintMultiplier = 1.6f;
-  private float airControl = 0.35f;
+
+  private final float jumpStrength = 5.5f;
+  private final float moveSpeed = 4.0f;
+  private final float sprintMultiplier = 1.8f;
+  private final float airControl = 0.6f;
 
   public PlayerCameraEntity(float x, float y, float z) {
     super(x, y, z);
@@ -29,6 +30,7 @@ public class PlayerCameraEntity extends CameraEntity {
 
     this.getRigidBody().setMass(1.0f);
     this.getRigidBody().setDrag(0.92f);
+    this.getRigidBody().setRestitution(0.0f); // Prevent bouncing on landing
 
     this.setCollisionShape(CollisionShape.CAPSULE);
     this.setCollisionRadius(0.4f);
@@ -40,6 +42,7 @@ public class PlayerCameraEntity extends CameraEntity {
     this.yaw = yaw;
     this.roll = roll;
     this.pitch = Math.max(-89, Math.min(89, pitch));
+    this.rotation = new Vec3(this.pitch, this.yaw, this.roll);
   }
 
   public float getPitch() {
@@ -66,19 +69,16 @@ public class PlayerCameraEntity extends CameraEntity {
     float mouseSensitivity = 0.1f;
     yaw += InputManager.getMouseDeltaX() * mouseSensitivity;
     pitch += InputManager.getMouseDeltaY() * mouseSensitivity;
+
+    // Clamp pitch to prevent breaking your neck
     pitch = Math.max(-89, Math.min(89, pitch));
     setRotation(pitch, yaw, 0);
 
     // --------------------------
-    // 3️⃣ Movement calculation
+    // 2️⃣ Movement calculation
     // --------------------------
-    if (isGrounded) {
-      // Apply extra friction when grounded
-      this.getRigidBody().setDrag(0.92f);
-    } else {
-      // Reduce friction when in the air
-      this.getRigidBody().setDrag(1f);
-    }
+    // Disable air drag to allow smooth jumping
+    this.getRigidBody().setDrag(isGrounded ? 0.95f : 1.0f);
 
     Vec3 movementInput = getMovementInput();
 
@@ -120,13 +120,11 @@ public class PlayerCameraEntity extends CameraEntity {
       input = input.add(new Vec3(-sinYaw, 0, cosYaw));
     }
 
-    // STRAFING - FIXED VERSION
+    // STRAFING
     if (InputManager.isKeyDown(GLFW.GLFW_KEY_A)) {
-      // LEFT strafe: perpendicular to forward, rotated 90 degrees counter-clockwise
       input = input.add(new Vec3(-cosYaw, 0, -sinYaw));
     }
     if (InputManager.isKeyDown(GLFW.GLFW_KEY_D)) {
-      // RIGHT strafe: perpendicular to forward, rotated 90 degrees clockwise
       input = input.add(new Vec3(cosYaw, 0, sinYaw));
     }
 
@@ -135,7 +133,7 @@ public class PlayerCameraEntity extends CameraEntity {
       wantsToJump = true;
     }
 
-    if (input.length() > 0) {
+    if (input.length() > 0.01f) {
       input = input.normalize();
     }
 
@@ -143,33 +141,28 @@ public class PlayerCameraEntity extends CameraEntity {
   }
 
   private void applyMovement(Vec3 direction, float speed, float deltaTime) {
-    if (direction.length() > 0.01f) {
-      Vec3 targetVelocity = direction.mul(speed);
+    Vec3 currentVel = getVelocity();
 
-      if (this.isRigidBodyEnabled()) {
-        // Use proper lerp function call
-        Vec3 currentVel = getVelocity();
-        Vec3 newVel = new Vec3(targetVelocity.x(), currentVel.y(), targetVelocity.z());
+    if (this.isRigidBodyEnabled()) {
+      if (direction.length() > 0.01f) {
+        Vec3 targetVelocity = direction.mul(speed);
+        Vec3 targetXz = new Vec3(targetVelocity.x(), currentVel.y(), targetVelocity.z());
 
-        // Manual linear interpolation since Vec3.lerp signature is different
-        float t = 0.1f; // Interpolation factor
-        Vec3 smoothedVel =
-            new Vec3(
-                currentVel.x() + (newVel.x() - currentVel.x()) * t,
-                currentVel.y() + (newVel.y() - currentVel.y()) * t,
-                currentVel.z() + (newVel.z() - currentVel.z()) * t);
+        float t = Math.min(1.0f, (isGrounded ? 15.0f : 2.0f) * deltaTime);
+        Vec3 smoothedVel = Vec3.lerp(currentVel, targetXz, t);
 
-        setVelocity(smoothedVel);
-      } else {
-        // Kinematic approach
-        this.setPosition(this.getPosition().add(targetVelocity.mul(deltaTime)));
+        // Preserve exact vertical velocity to avoid messing with gravity/jumping
+        setVelocity(new Vec3(smoothedVel.x(), currentVel.y(), smoothedVel.z()));
+      } else if (isGrounded) {
+        // Apply ground friction when no input
+        float t = Math.min(1.0f, 15.0f * deltaTime);
+        Vec3 zeroXz = new Vec3(0, currentVel.y(), 0);
+        setVelocity(Vec3.lerp(currentVel, zeroXz, t));
       }
     } else {
-      // Apply friction when no input
-      if (this.isRigidBodyEnabled()) {
-        Vec3 currentVel = getVelocity();
-        Vec3 frictionVel = new Vec3(currentVel.x() * 0.8f, currentVel.y(), currentVel.z() * 0.8f);
-        setVelocity(frictionVel);
+      // Kinematic approach
+      if (direction.length() > 0.01f) {
+        this.setPosition(this.getPosition().add(direction.mul(speed * deltaTime)));
       }
     }
   }
@@ -177,7 +170,10 @@ public class PlayerCameraEntity extends CameraEntity {
   private void handleJump() {
     if (wantsToJump) {
       Vec3 vel = getVelocity();
-      setVelocity(new Vec3(vel.x(), jumpStrength, vel.z()));
+      // Only jump if we aren't already moving up too fast
+      if (vel.y() < jumpStrength * 0.5f) {
+        setVelocity(new Vec3(vel.x(), jumpStrength, vel.z()));
+      }
       wantsToJump = false;
       isGrounded = false;
     }

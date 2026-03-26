@@ -25,6 +25,10 @@ public class Window {
   }
 
   public void init() {
+    init(0);
+  }
+
+  public void init(long shareContext) {
     GLFWErrorCallback.createPrint(System.err).set();
 
     if (!GLFW.glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
@@ -34,7 +38,7 @@ public class Window {
     GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
     GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, 4);
 
-    windowHandle = GLFW.glfwCreateWindow(width, height, title, 0, 0);
+    windowHandle = GLFW.glfwCreateWindow(width, height, title, 0, shareContext);
     if (windowHandle == 0) throw new RuntimeException("Failed to create GLFW window");
 
     GLFW.glfwMakeContextCurrent(windowHandle);

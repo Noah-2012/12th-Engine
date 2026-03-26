@@ -6,18 +6,25 @@ public class RigidBody {
 
   private float mass;
   private float drag;
+  private float angularDrag = 0.98f;
   private float restitution; // Bounciness (0.0 to 1.0)
   private Vec3 forceAccumulator;
+  private Vec3 torqueAccumulator;
 
   public RigidBody() {
     this.mass = 1f;
     this.drag = 0.98f; // Slight air resistance
     this.restitution = 0.5f;
     this.forceAccumulator = new Vec3(0, 0, 0);
+    this.torqueAccumulator = new Vec3(0, 0, 0);
   }
 
   public void applyForce(Vec3 force) {
     this.forceAccumulator = this.forceAccumulator.add(force);
+  }
+
+  public void applyTorque(Vec3 torque) {
+    this.torqueAccumulator = this.torqueAccumulator.add(torque);
   }
 
   public Vec3 calculateNewVelocity(
@@ -42,6 +49,22 @@ public class RigidBody {
     return newVelocity;
   }
 
+  public Vec3 calculateNewAngularVelocity(Vec3 currentAngularVelocity, float deltaTime) {
+    // Angular Acceleration = Torque / Mass
+    Vec3 angularAcceleration = torqueAccumulator.div(mass);
+
+    // Update Angular Velocity: w = w + alpha * dt
+    Vec3 newAngularVelocity = currentAngularVelocity.add(angularAcceleration.mul(deltaTime));
+
+    float dragFactor = (float) Math.pow(angularDrag, deltaTime * 60f);
+    newAngularVelocity = newAngularVelocity.mul(dragFactor);
+
+    // Reset torque for the next frame
+    this.torqueAccumulator = new Vec3(0, 0, 0);
+
+    return newAngularVelocity;
+  }
+
   // Getters and Setters
   public float getMass() {
     return mass;
@@ -57,6 +80,14 @@ public class RigidBody {
 
   public void setDrag(float drag) {
     this.drag = drag;
+  }
+
+  public float getAngularDrag() {
+    return angularDrag;
+  }
+
+  public void setAngularDrag(float angularDrag) {
+    this.angularDrag = angularDrag;
   }
 
   public float getRestitution() {

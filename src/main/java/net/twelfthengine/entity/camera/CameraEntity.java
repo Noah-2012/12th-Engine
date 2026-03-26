@@ -28,7 +28,7 @@ public class CameraEntity extends BasicEntity {
     this.yaw = yaw;
     this.roll = roll;
 
-    this.pitch = Math.max(-90, Math.min(90, pitch));
+    this.pitch = pitch;
   }
 
   public float getPitch() {

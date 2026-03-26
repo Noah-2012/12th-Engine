@@ -5,21 +5,25 @@ import java.nio.FloatBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import net.twelfthengine.coord.iab.IAB;
+import net.twelfthengine.core.resources.TwelfthPackage;
 import net.twelfthengine.entity.BasicEntity;
 import net.twelfthengine.entity.ModelEntity;
 import net.twelfthengine.entity.camera.CameraEntity;
 import net.twelfthengine.entity.world.BasicPlaneEntity;
 import net.twelfthengine.entity.world.LightEntity;
+import net.twelfthengine.entity.world.TextureEntity;
 import net.twelfthengine.math.Mat4;
 import net.twelfthengine.math.MatrixStack3D;
 import net.twelfthengine.math.Vec3;
 import net.twelfthengine.renderer.mesh.PlaneMesh;
+import net.twelfthengine.renderer.mesh.TextureMesh;
 import net.twelfthengine.renderer.mesh.UnitCubeMesh;
 import net.twelfthengine.renderer.obj.ObjLoader;
 import net.twelfthengine.renderer.obj.ObjModel;
 import net.twelfthengine.renderer.obj.VboModel;
 import net.twelfthengine.renderer.shader.ShaderProgram;
 import net.twelfthengine.renderer.shadow.ShadowFramebuffer;
+import net.twelfthengine.renderer.texture.TextureLoader;
 import net.twelfthengine.world.World;
 import org.joml.Matrix4f;
 import org.lwjgl.BufferUtils;
@@ -43,9 +47,38 @@ public class Renderer3D {
   private ShadowFramebuffer shadowFbo;
   private UnitCubeMesh unitCubeMesh;
   private PlaneMesh planeMesh;
+  private TextureMesh textureMesh;
+  private final Map<String, Integer> textureIdCache = new HashMap<>();
+
+  private org.joml.FrustumIntersection frustum;
+  private boolean frustumCullingEnabled = true;
+
+  public org.joml.FrustumIntersection getFrustum() {
+    return frustum;
+  }
+
+  public boolean isFrustumCullingEnabled() {
+    return frustumCullingEnabled;
+  }
+
+  public void setFrustumCullingEnabled(boolean frustumCullingEnabled) {
+    this.frustumCullingEnabled = frustumCullingEnabled;
+  }
 
   public MatrixStack3D getMatrices() {
     return modelStack;
+  }
+
+  public UnitCubeMesh getUnitCubeMesh() {
+    return unitCubeMesh;
+  }
+
+  public PlaneMesh getPlaneMesh() {
+    return planeMesh;
+  }
+
+  public TextureMesh getTextureMesh() {
+    return textureMesh;
   }
 
   public void setFovDegrees(float fovDegrees) {
@@ -74,6 +107,7 @@ public class Renderer3D {
       shadowFbo = new ShadowFramebuffer();
       unitCubeMesh = new UnitCubeMesh();
       planeMesh = new PlaneMesh();
+      textureMesh = new TextureMesh();
       shadowsEnabled = true;
     } catch (Exception e) {
       System.err.println("[Renderer3D] Shader shadows disabled: " + e.getMessage());
@@ -85,7 +119,7 @@ public class Renderer3D {
   // MODEL LOADING
   // =============================
 
-  private ObjModel loadObjModel(String path) {
+  public ObjModel loadObjModel(String path) {
     if (!modelCache.containsKey(path)) {
       try {
         ObjModel model = ObjLoader.load(path);
@@ -98,7 +132,7 @@ public class Renderer3D {
     return modelCache.get(path);
   }
 
-  private VboModel loadVboModel(String path) {
+  public VboModel loadVboModel(String path) {
     if (!vboCache.containsKey(path)) {
       ObjModel objModel = loadObjModel(path);
       if (objModel != null) {
@@ -107,6 +141,40 @@ public class Renderer3D {
       }
     }
     return vboCache.get(path);
+  }
+
+  public ObjModel loadObjModelFromPackage(TwelfthPackage pack, String internalPath) {
+    String cacheKey = pack.getArchiveName() + ":" + internalPath;
+    if (!modelCache.containsKey(cacheKey)) {
+      try {
+        ObjModel model = ObjLoader.loadFromPackage(pack, internalPath);
+        modelCache.put(cacheKey, model);
+      } catch (IOException e) {
+        System.err.println("Failed to load model from package: " + internalPath);
+        return null;
+      }
+    }
+    return modelCache.get(cacheKey);
+  }
+
+  public VboModel loadVboModelFromPackage(TwelfthPackage pack, String internalPath) {
+    String cacheKey = pack.getArchiveName() + ":" + internalPath;
+    if (!vboCache.containsKey(cacheKey)) {
+      ObjModel objModel = loadObjModelFromPackage(pack, internalPath);
+      if (objModel != null) {
+        VboModel vboModel = new VboModel(objModel);
+        vboCache.put(cacheKey, vboModel);
+      }
+    }
+    return vboCache.get(cacheKey);
+  }
+
+  public int loadTextureId(String path) {
+    if (!textureIdCache.containsKey(path)) {
+      int id = TextureLoader.loadTexture(path);
+      textureIdCache.put(path, id);
+    }
+    return textureIdCache.get(path);
   }
 
   // =============================
@@ -133,9 +201,6 @@ public class Renderer3D {
     } else {
       renderLegacyScene(world);
     }
-
-    System.out.println(
-        "shadowsEnabled=" + shadowsEnabled + " lightSpaceMatrix=" + lightSpaceMatrix);
   }
 
   private Matrix4f computeLightSpaceMatrix(LightEntity light) {
@@ -161,34 +226,29 @@ public class Renderer3D {
 
     depthShader.use();
 
+    org.joml.FrustumIntersection frustum = new org.joml.FrustumIntersection(lightSpace);
+
     for (BasicEntity e : world.getEntities()) {
       if (e instanceof LightEntity || e instanceof CameraEntity) continue;
-      if (e instanceof BasicPlaneEntity plane) {
-        Matrix4f model = modelMatrixForPlane(plane);
-        Matrix4f mvp = new Matrix4f(lightSpace).mul(model);
-        planeMesh.drawDepth(depthShader, mvp);
-      } else if (e instanceof ModelEntity me) {
-        String path = me.getModelPath();
-        if (path == null || path.isEmpty()) continue;
-        VboModel vbo = loadVboModel(path);
-        if (vbo == null) continue;
-        Matrix4f model = modelMatrixForModel(me, vbo);
-        Matrix4f mvp = new Matrix4f(lightSpace).mul(model);
-        System.out.println(
-            "Rendering model to shadow map at: "
-                + me.getPosition().x()
-                + " "
-                + me.getPosition().y()
-                + " "
-                + me.getPosition().z());
-        System.out.println(
-            "Lit render position: "
-                + me.getPosition().x()
-                + " "
-                + me.getPosition().y()
-                + " "
-                + me.getPosition().z());
-        vbo.renderDepth(depthShader, mvp);
+
+      // Frustum Culling
+      float radius = e.getCollisionRadius();
+      if (e instanceof ModelEntity me) {
+        radius = me.getModelBoundingRadius() * me.getSize();
+      } else if (e instanceof BasicPlaneEntity plane) {
+        radius = Math.max(plane.getWidth(), plane.getLength());
+      } else if (e instanceof TextureEntity te) {
+        radius = Math.max(te.getWidth(), te.getHeight());
+      }
+
+      if (frustumCullingEnabled
+          && !frustum.testSphere(
+              e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
+        continue;
+      }
+
+      if (e instanceof Renderable3D renderable) {
+        renderable.renderShadow(this, depthShader, lightSpace);
       }
     }
 
@@ -200,17 +260,23 @@ public class Renderer3D {
     GL11.glDisable(GL11.GL_CULL_FACE);
   }
 
-  private Matrix4f modelMatrixForPlane(BasicPlaneEntity plane) {
+  public Matrix4f modelMatrixForPlane(BasicPlaneEntity plane) {
     float y = plane.getTop();
     float w = plane.getWidth();
     float l = plane.getLength();
     return new Matrix4f().translate(0f, y, 0f).scale(w, 1f, l);
   }
 
-  private Matrix4f modelMatrixForModel(ModelEntity me, VboModel vbo) {
+  public Matrix4f modelMatrixForModel(ModelEntity me, VboModel vbo) {
     Vec3 p = me.getPosition();
+    Vec3 rot = me.getRotation();
     float s = me.getSize();
-    return new Matrix4f().translate(p.x(), p.y(), p.z()).scale(s);
+    return new Matrix4f()
+        .translate(p.x(), p.y(), p.z())
+        .rotateZ((float) Math.toRadians(rot.z()))
+        .rotateY((float) Math.toRadians(rot.y()))
+        .rotateX((float) Math.toRadians(rot.x()))
+        .scale(s);
   }
 
   private void renderLitScene(World world, LightEntity light, Matrix4f lightSpace) {
@@ -271,23 +337,29 @@ public class Renderer3D {
     GL13.glActiveTexture(GL13.GL_TEXTURE1);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, shadowFbo.getDepthTextureId());
 
+    this.frustum = new org.joml.FrustumIntersection(new Matrix4f(proj).mul(view));
+
     for (BasicEntity e : world.getEntities()) {
       if (e instanceof LightEntity || e instanceof CameraEntity) continue;
-      if (e instanceof BasicPlaneEntity plane) {
-        // Matrix4f model = modelMatrixForPlane(plane);
-        // unitCubeMesh.drawLit(litShader, model, view, proj, lightSpace);
-        // ^^^^^ This is really bad and wont work on the 4 Corner planes, we need to draw the plane
-        // itself, not a cube
-        Matrix4f model = modelMatrixForPlane(plane);
-        planeMesh.drawLit(litShader, model, view, proj, lightSpace);
-      } else if (e instanceof ModelEntity me) {
-        String path = me.getModelPath();
-        if (path == null || path.isEmpty()) continue;
-        VboModel vbo = loadVboModel(path);
-        ObjModel obj = loadObjModel(path);
-        if (vbo == null || obj == null) continue;
-        Matrix4f model = modelMatrixForModel(me, vbo);
-        vbo.renderLit(obj, litShader, model, view, proj, lightSpace);
+
+      // Frustum Culling
+      float radius = e.getCollisionRadius();
+      if (e instanceof ModelEntity me) {
+        radius = me.getModelBoundingRadius() * me.getSize();
+      } else if (e instanceof BasicPlaneEntity plane) {
+        radius = Math.max(plane.getWidth(), plane.getLength());
+      } else if (e instanceof TextureEntity te) {
+        radius = Math.max(te.getWidth(), te.getHeight());
+      }
+
+      if (frustumCullingEnabled
+          && !frustum.testSphere(
+              e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
+        continue;
+      }
+
+      if (e instanceof Renderable3D renderable) {
+        renderable.renderLit(this, litShader, view, proj, lightSpace);
       }
     }
 
@@ -317,6 +389,39 @@ public class Renderer3D {
         drawPlane(plane);
       } else if (e instanceof ModelEntity modelEntity) {
         renderModelEntity(modelEntity);
+      } else if (e instanceof TextureEntity te) {
+        String path = te.getTexturePath();
+        if (path == null || path.isEmpty()) continue;
+        int texId = loadTextureId(path);
+
+        GL11.glPushMatrix();
+        GL11.glTranslatef(te.getPosition().x(), te.getPosition().y(), te.getPosition().z());
+        GL11.glRotatef(te.getRotation().y(), 0, 1, 0);
+        GL11.glRotatef(te.getRotation().x(), 1, 0, 0);
+        GL11.glScalef(te.getWidth(), te.getHeight(), 1f);
+
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        setColor(1f, 1f, 1f, 1f);
+
+        GL11.glBegin(GL11.GL_QUADS);
+        GL11.glNormal3f(0, 0, 1);
+        GL11.glTexCoord2f(0, 0);
+        GL11.glVertex3f(-0.5f, -0.5f, 0);
+        GL11.glTexCoord2f(1, 0);
+        GL11.glVertex3f(0.5f, -0.5f, 0);
+        GL11.glTexCoord2f(1, 1);
+        GL11.glVertex3f(0.5f, 0.5f, 0);
+        GL11.glTexCoord2f(0, 1);
+        GL11.glVertex3f(-0.5f, 0.5f, 0);
+        GL11.glEnd();
+
+        GL11.glDisable(GL11.GL_BLEND);
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glPopMatrix();
       }
     }
   }
@@ -340,8 +445,11 @@ public class Renderer3D {
     Vec3 position = modelEntity.getPosition();
     GL11.glTranslatef(position.x(), position.y(), position.z());
 
-    // Apply rotation if needed (you might want to add rotation to ModelEntity)
-    // GL11.glRotatef(rotationAngle, rotationX, rotationY, rotationZ);
+    // Apply rotation
+    Vec3 rot = modelEntity.getRotation();
+    if (rot.z() != 0) GL11.glRotatef(rot.z(), 0, 0, 1);
+    if (rot.y() != 0) GL11.glRotatef(rot.y(), 0, 1, 0);
+    if (rot.x() != 0) GL11.glRotatef(rot.x(), 1, 0, 0);
 
     // Apply scale based on size
     float size = modelEntity.getSize();
@@ -358,7 +466,6 @@ public class Renderer3D {
   // =============================
 
   public void begin3D(CameraEntity cam) {
-
     float aspect = (float) width / height;
     Mat4 proj = Mat4.perspective(fovDegrees, aspect, 0.1f, 1000f);
 
@@ -376,7 +483,6 @@ public class Renderer3D {
   // =============================
 
   private void applyCamera(CameraEntity cam) {
-
     Vec3 pos = cam.getPosition();
 
     GL11.glRotatef(cam.getPitch(), 1, 0, 0);
@@ -547,7 +653,6 @@ public class Renderer3D {
   // =============================
 
   private void drawIAB(IAB box) {
-
     float w = box.getWidth() / 2f;
     float h = box.getHeight() / 2f;
     float d = box.getDepth() / 2f;
@@ -560,13 +665,22 @@ public class Renderer3D {
       new Vec3(-w, -h, d),
       new Vec3(w, -h, d),
       new Vec3(w, h, d),
-      new Vec3(-w, h, d)
+      new Vec3(-w, h, d),
     };
 
     int[][] edges = {
-      {0, 1}, {1, 2}, {2, 3}, {3, 0},
-      {4, 5}, {5, 6}, {6, 7}, {7, 4},
-      {0, 4}, {1, 5}, {2, 6}, {3, 7}
+      {0, 1},
+      {1, 2},
+      {2, 3},
+      {3, 0},
+      {4, 5},
+      {5, 6},
+      {6, 7},
+      {7, 4},
+      {0, 4},
+      {1, 5},
+      {2, 6},
+      {3, 7},
     };
 
     for (int[] e : edges) drawLine(p[e[0]], p[e[1]]);

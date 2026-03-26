@@ -84,6 +84,9 @@ public class World {
     // First update all entities normally
     for (BasicEntity e : entities) {
       e.update(deltaTime);
+      if (e instanceof net.twelfthengine.entity.world.TextureEntity te) {
+        te.faceCamera(activeCamera);
+      }
     }
 
     // Then handle collisions
@@ -99,6 +102,14 @@ public class World {
         ((BasicPlaneEntity) entity).render();
       } else if (entity instanceof ModelEntity modelEntity) {
         models.add(modelEntity);
+      }
+    }
+
+    for (int i = 0; i < entities.size(); i++) {
+      BasicEntity entityA = entities.get(i);
+      for (int j = i + 1; j < entities.size(); j++) {
+        BasicEntity entityB = entities.get(j);
+        entityA.checkAndResolveCollision(entityB);
       }
     }
 
@@ -123,21 +134,27 @@ public class World {
 
       if (activeCamera instanceof PlayerCameraEntity playerCamera) {
         playerCamera.setGrounded(grounded);
-        for (ModelEntity model : models) {
-          resolveCameraModelCollision(playerCamera, model);
-        }
+      }
+    }
+
+    // Mesh precise collisions for everything against models
+    for (BasicEntity entity : entities) {
+      if (!entity.isRigidBodyEnabled() && !(entity instanceof PlayerCameraEntity)) continue;
+      for (ModelEntity model : models) {
+        if (entity == model) continue;
+        resolveSphereModelCollision(entity, model);
       }
     }
   }
 
-  private void resolveCameraModelCollision(PlayerCameraEntity camera, ModelEntity model) {
+  private void resolveSphereModelCollision(BasicEntity entity, ModelEntity model) {
     ObjModel modelData = model.getModelData();
     if (modelData == null || modelData.faces.isEmpty()) return;
 
-    Vec3 camPos = camera.getPosition();
-    Vec3 camVel = camera.getVelocity();
-    float camRadius = camera.getCollisionRadius();
-    float camHalfHeight = camera.getCollisionHeight() * 0.5f;
+    Vec3 camPos = entity.getPosition();
+    Vec3 camVel = entity.getVelocity();
+    float camRadius = entity.getCollisionRadius();
+    float camHalfHeight = entity.getCollisionHeight() * 0.5f;
 
     Vec3 modelPos = model.getPosition();
     Vec3 modelCenter = modelPos.add(model.getModelCenter());
@@ -152,24 +169,50 @@ public class World {
     Vec3[] sampleCenters = {
       new Vec3(camPos.x(), camBottom, camPos.z()),
       new Vec3(camPos.x(), camCenterY, camPos.z()),
-      new Vec3(camPos.x(), camTop, camPos.z())
+      new Vec3(camPos.x(), camTop, camPos.z()),
     };
+
+    Vec3 rot = model.getRotation();
+    float rx = (float) Math.toRadians(rot.x());
+    float ry = (float) Math.toRadians(rot.y());
+    float rz = (float) Math.toRadians(rot.z());
 
     for (int iteration = 0; iteration < 3; iteration++) {
       boolean collided = false;
 
-      camPos = camera.getPosition();
+      camPos = entity.getPosition();
       sampleCenters =
           new Vec3[] {
             new Vec3(camPos.x(), camPos.y() - camHalfHeight + camRadius, camPos.z()),
             new Vec3(camPos.x(), camPos.y(), camPos.z()),
-            new Vec3(camPos.x(), camPos.y() + camHalfHeight - camRadius, camPos.z())
+            new Vec3(camPos.x(), camPos.y() + camHalfHeight - camRadius, camPos.z()),
           };
 
       for (ObjModel.Face face : modelData.faces) {
-        Vec3 a = modelPos.add(modelData.vertices.get(face.vertexIndices[0]).mul(model.getSize()));
-        Vec3 b = modelPos.add(modelData.vertices.get(face.vertexIndices[1]).mul(model.getSize()));
-        Vec3 c = modelPos.add(modelData.vertices.get(face.vertexIndices[2]).mul(model.getSize()));
+        Vec3 a =
+            applyTransform(
+                modelData.vertices.get(face.vertexIndices[0]),
+                modelPos,
+                model.getSize(),
+                rx,
+                ry,
+                rz);
+        Vec3 b =
+            applyTransform(
+                modelData.vertices.get(face.vertexIndices[1]),
+                modelPos,
+                model.getSize(),
+                rx,
+                ry,
+                rz);
+        Vec3 c =
+            applyTransform(
+                modelData.vertices.get(face.vertexIndices[2]),
+                modelPos,
+                model.getSize(),
+                rx,
+                ry,
+                rz);
 
         Vec3 triMin =
             new Vec3(
@@ -199,13 +242,13 @@ public class World {
             float pushOut = camRadius - dist + 0.001f;
 
             Vec3 newPos =
-                camera.getPosition().add(new Vec3(normal.x() * pushOut, 0f, normal.z() * pushOut));
-            camera.setPosition(newPos);
+                entity.getPosition().add(new Vec3(normal.x() * pushOut, 0f, normal.z() * pushOut));
+            entity.setPosition(newPos);
 
-            Vec3 currentVel = camera.getVelocity();
+            Vec3 currentVel = entity.getVelocity();
             float inwardSpeed = currentVel.x() * normal.x() + currentVel.z() * normal.z();
             if (inwardSpeed < 0f) {
-              camera.setVelocity(
+              entity.setVelocity(
                   new Vec3(
                       currentVel.x() - inwardSpeed * normal.x(),
                       currentVel.y(),
@@ -225,12 +268,12 @@ public class World {
   }
 
   private boolean aabbIntersects(Vec3 minA, Vec3 maxA, Vec3 minB, Vec3 maxB) {
-    return maxA.x() >= minB.x()
+    return (maxA.x() >= minB.x()
         && minA.x() <= maxB.x()
         && maxA.y() >= minB.y()
         && minA.y() <= maxB.y()
         && maxA.z() >= minB.z()
-        && minA.z() <= maxB.z();
+        && minA.z() <= maxB.z());
   }
 
   private Vec3 closestPointOnTriangle(Vec3 p, Vec3 a, Vec3 b, Vec3 c) {
@@ -281,5 +324,29 @@ public class World {
     Vec3 n = b.sub(a).cross(c.sub(a)).normalize();
     if (n.length() < 0.0001f) return new Vec3(1f, 0f, 0f);
     return n;
+  }
+
+  private Vec3 applyTransform(Vec3 v, Vec3 pos, float s, float rx, float ry, float rz) {
+    float vx = v.x() * s, vy = v.y() * s, vz = v.z() * s;
+
+    // Apply rotation X
+    float y1 = vy * (float) Math.cos(rx) - vz * (float) Math.sin(rx);
+    float z1 = vy * (float) Math.sin(rx) + vz * (float) Math.cos(rx);
+    vy = y1;
+    vz = z1;
+
+    // Apply rotation Y
+    float x2 = vx * (float) Math.cos(ry) + vz * (float) Math.sin(ry);
+    float z2 = -vx * (float) Math.sin(ry) + vz * (float) Math.cos(ry);
+    vx = x2;
+    vz = z2;
+
+    // Apply rotation Z
+    float x3 = vx * (float) Math.cos(rz) - vy * (float) Math.sin(rz);
+    float y3 = vx * (float) Math.sin(rz) + vy * (float) Math.cos(rz);
+    vx = x3;
+    vy = y3;
+
+    return pos.add(new Vec3(vx, vy, vz));
   }
 }
