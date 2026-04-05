@@ -14,8 +14,8 @@ public class PlayerCameraEntity extends CameraEntity {
   private boolean isGrounded = false;
   private boolean wantsToJump = false;
 
-  private final float jumpStrength = 5.5f;
-  private final float moveSpeed = 4.0f;
+  private final float jumpStrength = 6.5f;
+  private final float moveSpeed = 18.0f;
   private final float sprintMultiplier = 1.8f;
   private final float airControl = 0.6f;
 

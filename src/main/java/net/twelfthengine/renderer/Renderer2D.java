@@ -14,7 +14,7 @@ public class Renderer2D {
     this.width = window.getWidth();
     this.height = window.getHeight();
 
-    begin2D();
+    // begin2D();
   }
 
   public void begin2D() {
@@ -27,6 +27,18 @@ public class Renderer2D {
     GL11.glMatrixMode(GL11.GL_PROJECTION);
     GL11.glLoadIdentity();
     GL11.glOrtho(0, width, height, 0, -1, 1);
+    GL11.glMatrixMode(GL11.GL_MODELVIEW);
+    GL11.glLoadIdentity();
+  }
+
+  public void end2D() {
+    // Restore state expected by 3D renderer
+    GL11.glDisable(GL11.GL_BLEND);
+    GL11.glEnable(GL11.GL_DEPTH_TEST);
+
+    // VERY IMPORTANT: restore default matrix mode
+    GL11.glMatrixMode(GL11.GL_PROJECTION);
+    GL11.glLoadIdentity();
     GL11.glMatrixMode(GL11.GL_MODELVIEW);
     GL11.glLoadIdentity();
   }

@@ -29,6 +29,7 @@ import org.joml.Matrix4f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL30;
 
 public class Renderer3D {
 
@@ -49,6 +50,20 @@ public class Renderer3D {
   private PlaneMesh planeMesh;
   private TextureMesh textureMesh;
   private final Map<String, Integer> textureIdCache = new HashMap<>();
+
+  // Add these fields to Renderer3D:
+  private Matrix4f currentView = new Matrix4f();
+  private Matrix4f currentProj = new Matrix4f();
+
+  private Matrix4f lastVP = new Matrix4f();
+
+  public Matrix4f getLastVP() { return lastVP; }
+
+  private int activeFboId = 0;
+
+  public void setActiveFbo(int fboId) {
+    this.activeFboId = fboId;
+  }
 
   private org.joml.FrustumIntersection frustum;
   private boolean frustumCullingEnabled = true;
@@ -185,16 +200,18 @@ public class Renderer3D {
     CameraEntity cam = world.getActiveCamera();
     LightEntity shadowLight = world.getPrimaryShadowLight();
     Matrix4f lightSpaceMatrix =
-        (shadowsEnabled && shadowLight != null && shadowLight.isCastShadows())
-            ? computeLightSpaceMatrix(shadowLight)
-            : null;
+            (shadowsEnabled && shadowLight != null && shadowLight.isCastShadows())
+                    ? computeLightSpaceMatrix(shadowLight)
+                    : null;
 
     if (lightSpaceMatrix != null) {
       renderShadowPass(world, lightSpaceMatrix);
-      shadowFbo.unbind(width, height);
+      // Restore to the known active FBO — no driver query needed
+      GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, activeFboId);
+      GL11.glViewport(0, 0, width, height);
     }
 
-    begin3D(cam);
+    //begin3D(cam);
 
     if (lightSpaceMatrix != null) {
       renderLitScene(world, shadowLight, lightSpaceMatrix);
@@ -219,6 +236,12 @@ public class Renderer3D {
 
   private void renderShadowPass(World world, Matrix4f lightSpace) {
     shadowFbo.bindForShadowPass();
+
+    int status = GL30.glCheckFramebufferStatus(GL30.GL_FRAMEBUFFER);
+    if (status != GL30.GL_FRAMEBUFFER_COMPLETE) {
+      System.err.println("[SHADOW FBO] Incomplete! status=" + status);
+    }
+
     GL11.glEnable(GL11.GL_CULL_FACE);
     GL11.glCullFace(GL11.GL_FRONT);
     GL11.glEnable(GL11.GL_POLYGON_OFFSET_FILL);
@@ -254,7 +277,7 @@ public class Renderer3D {
 
     depthShader.unbind();
     GL11.glDisable(GL11.GL_POLYGON_OFFSET_FILL);
-    GL11.glCullFace(GL11.GL_BACK);
+    // GL11.glCullFace(GL11.GL_BACK);
 
     // this is new
     GL11.glDisable(GL11.GL_CULL_FACE);
@@ -283,47 +306,9 @@ public class Renderer3D {
     GL11.glDisable(GL11.GL_LIGHTING);
     litShader.use();
 
-    FloatBuffer vb = BufferUtils.createFloatBuffer(16);
-    GL11.glGetFloatv(GL11.GL_MODELVIEW_MATRIX, vb);
-    Matrix4f view =
-        new Matrix4f(
-            vb.get(0),
-            vb.get(1),
-            vb.get(2),
-            vb.get(3),
-            vb.get(4),
-            vb.get(5),
-            vb.get(6),
-            vb.get(7),
-            vb.get(8),
-            vb.get(9),
-            vb.get(10),
-            vb.get(11),
-            vb.get(12),
-            vb.get(13),
-            vb.get(14),
-            vb.get(15));
-
-    FloatBuffer pb = BufferUtils.createFloatBuffer(16);
-    GL11.glGetFloatv(GL11.GL_PROJECTION_MATRIX, pb);
-    Matrix4f proj =
-        new Matrix4f(
-            pb.get(0),
-            pb.get(1),
-            pb.get(2),
-            pb.get(3),
-            pb.get(4),
-            pb.get(5),
-            pb.get(6),
-            pb.get(7),
-            pb.get(8),
-            pb.get(9),
-            pb.get(10),
-            pb.get(11),
-            pb.get(12),
-            pb.get(13),
-            pb.get(14),
-            pb.get(15));
+    // Use cached matrices directly — remove ALL glGetFloatv calls
+    Matrix4f view = currentView;
+    Matrix4f proj = currentProj;
 
     Vec3 toLight = light.getDirectionToLightWorld().mul(-1f);
     Vec3 lc = light.getColor();
@@ -342,7 +327,6 @@ public class Renderer3D {
     for (BasicEntity e : world.getEntities()) {
       if (e instanceof LightEntity || e instanceof CameraEntity) continue;
 
-      // Frustum Culling
       float radius = e.getCollisionRadius();
       if (e instanceof ModelEntity me) {
         radius = me.getModelBoundingRadius() * me.getSize();
@@ -353,7 +337,7 @@ public class Renderer3D {
       }
 
       if (frustumCullingEnabled
-          && !frustum.testSphere(
+              && !frustum.testSphere(
               e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
         continue;
       }
@@ -367,7 +351,6 @@ public class Renderer3D {
     GL13.glActiveTexture(GL13.GL_TEXTURE1);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
-
     GL11.glEnable(GL11.GL_LIGHTING);
   }
 
@@ -386,6 +369,7 @@ public class Renderer3D {
                 new Vec3(w, y, l)
         );
         */
+        GL11.glCullFace(GL11.GL_FRONT);
         drawPlane(plane);
       } else if (e instanceof ModelEntity modelEntity) {
         renderModelEntity(modelEntity);
@@ -437,6 +421,14 @@ public class Renderer3D {
     VboModel vboModel = loadVboModel(modelPath);
     ObjModel objModel = loadObjModel(modelPath);
 
+    if (objModel == null) {
+      System.err.println("[Shadow] Failed to load model from package: " + modelPath);
+    }
+
+    if (vboModel == null) {
+      System.err.println("[Shadow] VBO not created for: " + modelPath);
+    }
+
     if (vboModel == null || objModel == null) return;
 
     GL11.glPushMatrix();
@@ -467,15 +459,39 @@ public class Renderer3D {
 
   public void begin3D(CameraEntity cam) {
     float aspect = (float) width / height;
-    Mat4 proj = Mat4.perspective(fovDegrees, aspect, 0.1f, 1000f);
+    currentProj = new Matrix4f().perspective(
+            (float) Math.toRadians(fovDegrees), aspect, 0.1f, 1000f);
 
+    Vec3 pos = cam.getPosition();
+    currentView = new Matrix4f()
+            .rotateX((float) Math.toRadians(cam.getPitch()))
+            .rotateY((float) Math.toRadians(cam.getYaw()))
+            .translate(-pos.x(), -pos.y(), -pos.z());
+
+    lastVP = new Matrix4f(currentProj).mul(currentView);
+
+    // --- DEFINITIVE TEST ---
+    // Extract the forward vector from the view matrix to see where camera points
+    // Row 2 of the view matrix is the forward vector
+    float fx = currentView.m02();
+    float fy = currentView.m12();
+    float fz = currentView.m22();
+    System.out.println("[CAM] pitch=" + cam.getPitch()
+            + " yaw=" + cam.getYaw()
+            + " forward=(" + fx + "," + fy + "," + fz + ")"
+            + " viewDet=" + currentView.determinant()
+            + " projDet=" + currentProj.determinant());
+    // --- END TEST ---
+
+    FloatBuffer pb = BufferUtils.createFloatBuffer(16);
+    currentProj.get(pb);
     GL11.glMatrixMode(GL11.GL_PROJECTION);
-    GL11.glLoadMatrixf(proj.m);
+    GL11.glLoadMatrixf(pb);
 
+    FloatBuffer vb = BufferUtils.createFloatBuffer(16);
+    currentView.get(vb);
     GL11.glMatrixMode(GL11.GL_MODELVIEW);
-    GL11.glLoadIdentity();
-
-    applyCamera(cam);
+    GL11.glLoadMatrixf(vb);
   }
 
   // =============================
@@ -485,11 +501,15 @@ public class Renderer3D {
   private void applyCamera(CameraEntity cam) {
     Vec3 pos = cam.getPosition();
 
-    GL11.glRotatef(cam.getPitch(), 1, 0, 0);
-    GL11.glRotatef(cam.getYaw(), 0, 1, 0);
-    GL11.glRotatef(cam.getRoll(), 0, 0, 1);
+    // Build view matrix explicitly — no matrix order ambiguity
+    Matrix4f view = new Matrix4f()
+            .rotateX((float) Math.toRadians(cam.getPitch()))
+            .rotateY((float) Math.toRadians(cam.getYaw()))
+            .translate(-pos.x(), -pos.y(), -pos.z());
 
-    GL11.glTranslatef(-pos.x(), -pos.y(), -pos.z());
+    FloatBuffer buf = BufferUtils.createFloatBuffer(16);
+    view.get(buf);
+    GL11.glLoadMatrixf(buf);
   }
 
   // =============================
@@ -692,7 +712,7 @@ public class Renderer3D {
     float y = plane.getTop();
 
     GL11.glBegin(GL11.GL_QUADS);
-    GL11.glNormal3f(0f, 1f, 0f); // Oberseite zeigt nach oben
+    GL11.glNormal3f(0f, 1f, 0f);
     GL11.glVertex3f(-w, y, -l);
     GL11.glVertex3f(w, y, -l);
     GL11.glVertex3f(w, y, l);

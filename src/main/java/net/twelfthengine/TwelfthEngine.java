@@ -5,8 +5,8 @@ import net.twelfthengine.controls.InputManager;
 import net.twelfthengine.coord.iab.IAB;
 import net.twelfthengine.core.EngineObject;
 import net.twelfthengine.core.debug.CullingDebugWindow;
+import net.twelfthengine.core.discord.DiscordPresence;
 import net.twelfthengine.core.logger.Logger;
-import net.twelfthengine.core.resources.*;
 import net.twelfthengine.core.resources.TwelfthPackage;
 import net.twelfthengine.core.tick.TickManager;
 import net.twelfthengine.core.tick.TickPhase;
@@ -19,6 +19,7 @@ import net.twelfthengine.entity.world.BasicPlaneEntity;
 import net.twelfthengine.entity.world.LightEntity;
 import net.twelfthengine.entity.world.TextureEntity;
 import net.twelfthengine.gui.PauseMenuScreen;
+import net.twelfthengine.gui.VideoIntroScreen;
 import net.twelfthengine.math.Vec3;
 import net.twelfthengine.renderer.Renderer2D;
 import net.twelfthengine.renderer.Renderer3D;
@@ -46,6 +47,7 @@ public class TwelfthEngine {
   public static void main(String[] args) {
     EngineObject engine = EngineObject.getInstance();
     engine.start();
+    DiscordPresence.init();
     Logger.info("Startup", "Starting EngineObject");
 
     TickManager tickManager = engine.getTickManager();
@@ -62,7 +64,7 @@ public class TwelfthEngine {
     Renderer3D r3d = new Renderer3D(1920, 1080);
     TextRenderer textRenderer = new TextRenderer();
     RenderPipeline renderPipeline = new RenderPipeline();
-    r3d.setFovDegrees(95f);
+    r3d.setFovDegrees(120f);
 
     Window debugWindow = null;
     Renderer2D debugRenderer = null;
@@ -135,7 +137,17 @@ public class TwelfthEngine {
 
     Logger.showConsole();
 
-    Logger.info("Startup", "Starting 12th Engine v1.0");
+    Logger.info("Startup", "Starting 12th Engine v1.1.2");
+
+    VideoIntroScreen introScreen = null;
+    try {
+      introScreen =
+          new VideoIntroScreen(
+              window, renderer, textRenderer, "src/main/resources/engine-intro.mp4");
+    } catch (Exception e) {
+      e.printStackTrace();
+      Logger.error("Intro", "Failed to initialize intro screen!");
+    }
 
     // --- OBJ ENTITY SETUP ---
     /*
@@ -459,12 +471,38 @@ public class TwelfthEngine {
 
     long fpsWindowStart = System.nanoTime();
     int framesInWindow = 0;
+    long discordLastUpdate = System.nanoTime();
+    double DISCORD_UPDATE_INTERVAL = 5.0;
 
     while (!window.shouldClose() && EngineObject.getInstance().isRunning()) {
       long currentTime = System.nanoTime();
       float deltaTime = (currentTime - lastTime) / 1_000_000_000f;
       lastTime = currentTime;
       framesInWindow++;
+
+      GLFW.glfwPollEvents();
+      InputManager.update();
+
+      if (InputManager.isKeyPressed(GLFW.GLFW_KEY_F3)) {
+        showDebugOverlay[0] = !showDebugOverlay[0];
+      }
+      if (InputManager.isKeyPressed(GLFW.GLFW_KEY_F11)) {
+        window.toggleFullscreen();
+      }
+
+      if (introScreen != null && introScreen.isPlaying()) {
+        try {
+          GLFW.glfwPollEvents();
+          introScreen.update(deltaTime);
+          GLFW.glfwMakeContextCurrent(window.getHandle());
+          introScreen.render();
+          window.update();
+        } catch (Exception e) {
+          e.printStackTrace();
+          Logger.error("Intro", "Error during intro playback!");
+        }
+        continue;
+      }
 
       accumulator += deltaTime;
 
@@ -495,8 +533,6 @@ public class TwelfthEngine {
       }
       profiler.update();
 
-      GLFW.glfwPollEvents();
-      InputManager.update();
       if (InputManager.isKeyPressed(GLFW.GLFW_KEY_ESCAPE)) {
         paused[0] = !paused[0];
         if (paused[0]) {
@@ -514,12 +550,6 @@ public class TwelfthEngine {
         } else if (a == PauseMenuScreen.Action.EXIT) {
           window.requestClose();
         }
-      }
-      if (InputManager.isKeyPressed(GLFW.GLFW_KEY_F3)) {
-        showDebugOverlay[0] = !showDebugOverlay[0];
-      }
-      if (InputManager.isKeyPressed(GLFW.GLFW_KEY_F11)) {
-        window.toggleFullscreen();
       }
       if (InputManager.isKeyPressed(GLFW.GLFW_KEY_L)) {
         SIMULATE_LAG = !SIMULATE_LAG;
@@ -552,6 +582,22 @@ public class TwelfthEngine {
         engine.getWorld().update(deltaTime);
       }
 
+      double discordElapsed = (currentTime - discordLastUpdate) / 1_000_000_000.0;
+      if (discordElapsed >= DISCORD_UPDATE_INTERVAL) {
+        String state;
+        if (paused[0]) {
+          state = "Paused";
+        } else {
+          state = "In World";
+        }
+
+        String details = "FPS: " + CURRENT_FPS + " | TPS: " + CURRENT_TPS;
+
+        DiscordPresence.update(details, state);
+
+        discordLastUpdate = currentTime;
+      }
+
       GLFW.glfwMakeContextCurrent(window.getHandle());
       renderPipeline.renderFrame(new RenderContext(window, engine.getWorld(), renderer, r3d));
       window.update();
@@ -577,6 +623,7 @@ public class TwelfthEngine {
     }
     window.close();
     engine.stop();
+    DiscordPresence.shutdown();
     Logger.info("Window", "Window closed, Engine continues running!");
   }
 }

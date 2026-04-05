@@ -22,6 +22,7 @@ public class ShaderProgram {
     programId = GL20.glCreateProgram();
     GL20.glAttachShader(programId, vs);
     GL20.glAttachShader(programId, fs);
+    GL20.glBindAttribLocation(programId, 0, "aPos");
     GL20.glLinkProgram(programId);
     if (GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) == 0) {
       throw new RuntimeException("Shader link failed: " + GL20.glGetProgramInfoLog(programId));
@@ -72,6 +73,10 @@ public class ShaderProgram {
 
   public void setUniform1i(String name, int v) {
     GL20.glUniform1i(getUniformLocation(name), v);
+  }
+
+  public void setUniform1f(String name, float v) {
+    GL20.glUniform1f(getUniformLocation(name), v);
   }
 
   public static FloatBuffer matrixToBuffer(org.joml.Matrix4f m) {

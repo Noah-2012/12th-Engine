@@ -178,9 +178,15 @@ public class ModelEntity extends BasicEntity implements Renderable3D {
 
   @Override
   public void renderShadow(Renderer3D renderer, ShaderProgram depthShader, Matrix4f lightSpace) {
-    if (modelPath == null || modelPath.isEmpty()) return;
-    VboModel vbo = renderer.loadVboModel(modelPath);
+    VboModel vbo;
+    if (twmPackage != null) {
+      vbo = renderer.loadVboModelFromPackage(twmPackage, archivePath);
+    } else {
+      if (modelPath == null || modelPath.isEmpty()) return;
+      vbo = renderer.loadVboModel(modelPath);
+    }
     if (vbo == null) return;
+
     Matrix4f model = renderer.modelMatrixForModel(this, vbo);
     Matrix4f mvp = new Matrix4f(lightSpace).mul(model);
     vbo.renderDepth(depthShader, mvp);
