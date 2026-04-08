@@ -15,9 +15,14 @@ public class PlayerCameraEntity extends CameraEntity {
   private boolean wantsToJump = false;
 
   private final float jumpStrength = 6.5f;
-  private final float moveSpeed = 18.0f;
-  private final float sprintMultiplier = 1.8f;
-  private final float airControl = 0.6f;
+  private final float moveSpeed = 14.0f;
+  private final float sprintMultiplier = 1.3f;
+  private final float airControl = 0.5f;
+
+  private float moveBlend = 0f; // 0..1 -> Beschleunigungszustand
+  private float stopBlend = 0f; // 0..1 -> Bremszustand
+  private final float accelTime = 0.55f; // Sekunden bis volle Geschwindigkeit
+  private final float stopTime = 0.65f; // Sekunden bis Stillstand
 
   public PlayerCameraEntity(float x, float y, float z) {
     super(x, y, z);
@@ -143,27 +148,47 @@ public class PlayerCameraEntity extends CameraEntity {
   private void applyMovement(Vec3 direction, float speed, float deltaTime) {
     Vec3 currentVel = getVelocity();
 
-    if (this.isRigidBodyEnabled()) {
-      if (direction.length() > 0.01f) {
-        Vec3 targetVelocity = direction.mul(speed);
-        Vec3 targetXz = new Vec3(targetVelocity.x(), currentVel.y(), targetVelocity.z());
+    if (!this.isRigidBodyEnabled()) return;
 
-        float t = Math.min(1.0f, (isGrounded ? 15.0f : 2.0f) * deltaTime);
-        Vec3 smoothedVel = Vec3.lerp(currentVel, targetXz, t);
+    boolean hasInput = direction.length() > 0.01f;
 
-        // Preserve exact vertical velocity to avoid messing with gravity/jumping
-        setVelocity(new Vec3(smoothedVel.x(), currentVel.y(), smoothedVel.z()));
-      } else if (isGrounded) {
-        // Apply ground friction when no input
-        float t = Math.min(1.0f, 15.0f * deltaTime);
-        Vec3 zeroXz = new Vec3(0, currentVel.y(), 0);
-        setVelocity(Vec3.lerp(currentVel, zeroXz, t));
-      }
-    } else {
-      // Kinematic approach
-      if (direction.length() > 0.01f) {
-        this.setPosition(this.getPosition().add(direction.mul(speed * deltaTime)));
-      }
+    // ---------------------------------
+    // 🎮 BLEND TIMER UPDATE
+    // ---------------------------------
+    if (hasInput) {
+      moveBlend += deltaTime / accelTime;
+      stopBlend = 0f;
+    } else if (isGrounded) {
+      stopBlend += deltaTime / stopTime;
+      moveBlend = 0f;
+    }
+
+    moveBlend = Math.min(moveBlend, 1f);
+    stopBlend = Math.min(stopBlend, 1f);
+
+    // Sinus Kurven
+    float accelT = easeInOutSine(moveBlend);
+    float stopT = easeOutSine(stopBlend);
+
+    // ---------------------------------
+    // 🚀 BESCHLEUNIGEN
+    // ---------------------------------
+    if (hasInput) {
+      Vec3 targetVelocity = direction.mul(speed);
+      Vec3 targetXz = new Vec3(targetVelocity.x(), currentVel.y(), targetVelocity.z());
+
+      Vec3 smoothedVel = Vec3.lerp(currentVel, targetXz, accelT);
+      setVelocity(new Vec3(smoothedVel.x(), currentVel.y(), smoothedVel.z()));
+      return;
+    }
+
+    // ---------------------------------
+    // 🛑 BREMSEN
+    // ---------------------------------
+    if (isGrounded) {
+      Vec3 zeroXz = new Vec3(0, currentVel.y(), 0);
+      Vec3 smoothedVel = Vec3.lerp(currentVel, zeroXz, stopT);
+      setVelocity(smoothedVel);
     }
   }
 
@@ -177,6 +202,14 @@ public class PlayerCameraEntity extends CameraEntity {
       wantsToJump = false;
       isGrounded = false;
     }
+  }
+
+  private float easeInOutSine(float t) {
+    return (float) (-(Math.cos(Math.PI * t) - 1) / 2.0);
+  }
+
+  private float easeOutSine(float t) {
+    return (float) Math.sin((t * Math.PI) / 2.0);
   }
 
   @Override

@@ -104,10 +104,14 @@ public class VideoIntroScreen {
     int sh = window.getHeight();
 
     GL11.glBegin(GL11.GL_QUADS);
-    GL11.glTexCoord2f(0f, 0f); GL11.glVertex2i(0, 0);
-    GL11.glTexCoord2f(1f, 0f); GL11.glVertex2i(sw, 0);
-    GL11.glTexCoord2f(1f, 1f); GL11.glVertex2i(sw, sh);
-    GL11.glTexCoord2f(0f, 1f); GL11.glVertex2i(0, sh);
+    GL11.glTexCoord2f(0f, 0f);
+    GL11.glVertex2i(0, 0);
+    GL11.glTexCoord2f(1f, 0f);
+    GL11.glVertex2i(sw, 0);
+    GL11.glTexCoord2f(1f, 1f);
+    GL11.glVertex2i(sw, sh);
+    GL11.glTexCoord2f(0f, 1f);
+    GL11.glVertex2i(0, sh);
     GL11.glEnd();
 
     GL11.glDisable(GL11.GL_TEXTURE_2D);

@@ -1,9 +1,15 @@
 package net.twelfthengine.window;
 
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import net.twelfthengine.core.resources.ResourceExtractor;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
+import org.lwjgl.glfw.GLFWImage;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.stb.STBImage;
+import org.lwjgl.system.MemoryStack;
 
 public class Window {
 
@@ -179,6 +185,39 @@ public class Window {
           videoMode.refreshRate());
       isFullscreen = true;
       System.out.println("[Window] Entered fullscreen mode");
+    }
+  }
+
+  public void setWindowIconFromResource(String resourcePath) {
+    try (MemoryStack stack = MemoryStack.stackPush()) {
+
+      // 🔥 Resource aus JAR in Temp-Datei extrahieren
+      String iconPath = ResourceExtractor.extract(resourcePath);
+
+      IntBuffer w = stack.mallocInt(1);
+      IntBuffer h = stack.mallocInt(1);
+      IntBuffer channels = stack.mallocInt(1);
+
+      // PNG laden (immer RGBA)
+      ByteBuffer image = STBImage.stbi_load(iconPath, w, h, channels, 4);
+      if (image == null) {
+        throw new RuntimeException("Failed to load window icon: " + STBImage.stbi_failure_reason());
+      }
+
+      GLFWImage icon = GLFWImage.malloc(stack);
+      icon.set(w.get(0), h.get(0), image);
+
+      GLFWImage.Buffer icons = GLFWImage.malloc(1, stack);
+      icons.put(0, icon);
+
+      GLFW.glfwSetWindowIcon(windowHandle, icons);
+
+      STBImage.stbi_image_free(image);
+
+      System.out.println("[Window] Icon loaded from resource: " + resourcePath);
+
+    } catch (Exception e) {
+      System.err.println("[Window] Failed to set window icon: " + e.getMessage());
     }
   }
 

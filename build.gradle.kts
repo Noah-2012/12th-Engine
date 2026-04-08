@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "net.twelfthengine"
-version = "1.2"
+version = "1.1.3"
 var lwjglVersion = "3.4.1"
 var lwjglNatives = "natives-windows"
 
@@ -177,9 +177,10 @@ tasks.register<Exec>("packageApp") {
         jpackage,
         "--type", "app-image",
         "--input", "build/libs",
-        "--main-jar", "12th-Engine-1.2-fat.jar",
+        "--main-jar", "12th-Engine-1.1.3-fat.jar",
         "--main-class", "com.mygame.MyGame",
         "--name", "TwelfthEngine",
+        "--icon", "src/main/resources/app-icon.ico",
         "--java-options", "--enable-native-access=ALL-UNNAMED",
         "--java-options", "-XX:+UseCompressedOops",
         "--jlink-options", "--strip-debug",

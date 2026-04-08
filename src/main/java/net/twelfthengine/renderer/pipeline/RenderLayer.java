@@ -6,7 +6,8 @@ public enum RenderLayer {
   DEBUG_3D(1),
   UI_2D(2),
   POST_BLIT(3),
-  UI_2D_OVERLAY(4);
+  UI_2D_OVERLAY(4),
+  UI_2D_FOREGROUND(5);
 
   private final int order;
 

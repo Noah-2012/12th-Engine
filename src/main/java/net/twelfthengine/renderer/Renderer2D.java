@@ -17,6 +17,10 @@ public class Renderer2D {
     // begin2D();
   }
 
+  public int getWidth() {
+    return width;
+  }
+
   public void begin2D() {
     GL11.glDisable(GL11.GL_DEPTH_TEST);
     GL11.glDisable(GL11.GL_LIGHTING);

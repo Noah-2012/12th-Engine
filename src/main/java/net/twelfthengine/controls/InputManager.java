@@ -16,6 +16,9 @@ public class InputManager {
   private static double lastMouseX, lastMouseY;
   private static double deltaX, deltaY;
 
+  private static boolean inputBlocked = false;
+  private static final boolean[] bypassKeys = new boolean[GLFW.GLFW_KEY_LAST + 1];
+
   private InputManager() {}
 
   // =========================
@@ -65,14 +68,17 @@ public class InputManager {
   // =========================
 
   public static boolean isKeyDown(int key) {
+    if (inputBlocked && !bypassKeys[key]) return false;
     return keys[key];
   }
 
   public static boolean isKeyPressed(int key) {
+    if (inputBlocked && !bypassKeys[key]) return false;
     return keys[key] && !keysLast[key];
   }
 
   public static boolean isKeyReleased(int key) {
+    if (inputBlocked && !bypassKeys[key]) return false;
     return !keys[key] && keysLast[key];
   }
 
@@ -105,10 +111,12 @@ public class InputManager {
   }
 
   public static double getMouseDeltaX() {
+    if (inputBlocked) return 0;
     return deltaX;
   }
 
   public static double getMouseDeltaY() {
+    if (inputBlocked) return 0;
     return deltaY;
   }
 
@@ -119,5 +127,25 @@ public class InputManager {
   public static void setCursorLocked(boolean locked) {
     GLFW.glfwSetInputMode(
         window, GLFW.GLFW_CURSOR, locked ? GLFW.GLFW_CURSOR_DISABLED : GLFW.GLFW_CURSOR_NORMAL);
+  }
+
+  // =========================
+  // INPUT BLOCKING (NEW)
+  // =========================
+
+  public static void setInputBlocked(boolean blocked) {
+    inputBlocked = blocked;
+  }
+
+  public static boolean isInputBlocked() {
+    return inputBlocked;
+  }
+
+  public static void allowBypassKey(int key) {
+    bypassKeys[key] = true;
+  }
+
+  public static void removeBypassKey(int key) {
+    bypassKeys[key] = false;
   }
 }

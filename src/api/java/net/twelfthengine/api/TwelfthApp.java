@@ -16,37 +16,36 @@ public abstract class TwelfthApp {
   // ------------------------------------------------------------------
 
   /**
-   * Called once after the engine, window, and world are initialised.
-   * Spawn your entities and set the active camera here.
+   * Called once after the engine, window, and world are initialised. Spawn your entities and set
+   * the active camera here.
    */
   public abstract void onInit(World world, AppConfig config);
 
   /**
-   * Called once after onInit. Build and return your full RenderPipeline here.
-   * The engine passes you pre-constructed Renderer2D, Renderer3D, and
-   * TextRenderer so you don't have to create them yourself.
+   * Called once after onInit. Build and return your full RenderPipeline here. The engine passes you
+   * pre-constructed Renderer2D, Renderer3D, and TextRenderer so you don't have to create them
+   * yourself.
    *
-   * The returned pipeline is handed straight to the main loop — you own
-   * every RenderLayer step inside it.
+   * <p>The returned pipeline is handed straight to the main loop — you own every RenderLayer step
+   * inside it.
    */
   public abstract RenderPipeline onSetupRenderer(
-          World world,
-          AppConfig config,
-          Window window,
-          Renderer2D renderer2D,
-          Renderer3D renderer3D,
-          TextRenderer textRenderer
-  ) throws Exception;
+      World world,
+      AppConfig config,
+      Window window,
+      Renderer2D renderer2D,
+      Renderer3D renderer3D,
+      TextRenderer textRenderer)
+      throws Exception;
 
   /**
    * Called every fixed game tick at the rate defined in AppConfig.
+   *
    * @param deltaTime fixed tick time in seconds
    */
   public void onTick(double deltaTime) {}
 
-  /**
-   * Called on shutdown — free any game-specific resources here.
-   */
+  /** Called on shutdown — free any game-specific resources here. */
   public void onDispose() {}
 
   // ------------------------------------------------------------------
