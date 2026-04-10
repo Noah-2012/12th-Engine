@@ -14,12 +14,15 @@ import org.lwjgl.system.MemoryStack;
 public class Window {
 
   private long windowHandle;
-  private final int width, height;
+  private int width, height;
   private final String title;
   private final int id; // ID des Fensters
   private boolean mouseLocked = false; // Flag für Mausstatus
   private boolean isFullscreen = false; // Fullscreen state
   private int windowedX, windowedY, windowedWidth, windowedHeight; // Windowed mode state
+
+    private final java.util.List<java.util.function.BiConsumer<Integer,Integer>> resizeListeners
+            = new java.util.ArrayList<>();
 
   public Window(int id, int width, int height, String title) {
     this.id = id;
@@ -72,9 +75,27 @@ public class Window {
     GLFW.glfwSwapInterval(1);
     GLFW.glfwShowWindow(windowHandle);
 
+      GLFW.glfwSetFramebufferSizeCallback(windowHandle, (win, w, h) -> {
+          this.width  = w;
+          this.height = h;
+          GL11.glViewport(0, 0, w, h);
+          for (var listener : resizeListeners) listener.accept(w, h);
+      });
+
+      // Sync to actual framebuffer size immediately (handles HiDPI at startup)
+      int[] fw = new int[1], fh = new int[1];
+      GLFW.glfwGetFramebufferSize(windowHandle, fw, fh);
+      this.width  = fw[0];
+      this.height = fh[0];
+      GL11.glViewport(0, 0, this.width, this.height);
+
     System.out.println(
         "[Window] OpenGL Window created: ID=" + id + " Size=" + width + "x" + height);
   }
+
+    public void addResizeListener(java.util.function.BiConsumer<Integer,Integer> listener) {
+        resizeListeners.add(listener);
+    }
 
   // Maus innerhalb des Fensters sperren
   public void lockMouse() {

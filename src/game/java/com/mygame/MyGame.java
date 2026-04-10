@@ -13,7 +13,7 @@ import net.twelfthengine.entity.world.BasicPlaneEntity;
 import net.twelfthengine.entity.world.LightEntity;
 import net.twelfthengine.entity.world.TextureEntity;
 import net.twelfthengine.math.Vec3;
-import net.twelfthengine.qgui.*; // Import Noah's new GUI System
+import net.twelfthengine.qgui.*;
 import net.twelfthengine.renderer.Renderer2D;
 import net.twelfthengine.renderer.Renderer3D;
 import net.twelfthengine.renderer.TextRenderer;
@@ -30,13 +30,10 @@ import org.lwjgl.opengl.GL11;
 
 public class MyGame extends TwelfthApp {
 
-  // --- Entities ---
-  private PlayerCameraEntity camera;
-  private LightEntity mainLight;
+    private LightEntity mainLight;
   private ModelEntity bombEntity;
-  private TextureEntity treeSprite;
 
-  // --- Effects ---
+    // --- Effects ---
   private PostProcessPipeline postProcess;
 
   // --- QGUI System ---
@@ -50,7 +47,8 @@ public class MyGame extends TwelfthApp {
   }
 
   public void onInit(World world, AppConfig config) {
-    camera = new PlayerCameraEntity(0f, 5f, 0f);
+      // --- Entities ---
+      PlayerCameraEntity camera = new PlayerCameraEntity(0f, 5f, 0f);
     camera.setPosition(new Vec3(0, 5, 0));
     camera.setRotation(0, 0, 0);
     world.addEntity(camera);
@@ -94,7 +92,7 @@ public class MyGame extends TwelfthApp {
     }
 
     // Tree billboard sprite
-    treeSprite = new TextureEntity(-10, 2, 0, "/models/tree/DB2X2_L01.png", 2.0f, 4.0f);
+      TextureEntity treeSprite = new TextureEntity(-10, 2, 0, "/models/tree/DB2X2_L01.png", 2.0f, 4.0f);
     world.addEntity(treeSprite);
 
     // 4. Initialize QGUI
@@ -171,6 +169,7 @@ public class MyGame extends TwelfthApp {
 
     this.windowInstance = window; // Capture window reference
     renderer3D.setFrustumCullingEnabled(true);
+
     RenderPipeline pipeline = new RenderPipeline();
 
     postProcess = new PostProcessPipeline(config.width(), config.height());
@@ -184,7 +183,6 @@ public class MyGame extends TwelfthApp {
           if (currentCState && !lastCState) {
             isGuiVisible = !isGuiVisible;
 
-            // ⭐ NEU
             InputManager.setInputBlocked(isGuiVisible);
 
             if (windowInstance != null) {
@@ -226,7 +224,6 @@ public class MyGame extends TwelfthApp {
     pipeline.addStep(
         RenderLayer.UI_2D_OVERLAY,
         ctx -> {
-          // CONTEXT MENU IN HERE IS UNSTABLE BECAUSE OF THE OTHER THINGS THAT ARE ALREADY IN HERE
         });
 
     pipeline.addStep(

@@ -19,7 +19,7 @@ public abstract class TwelfthApp {
    * Called once after the engine, window, and world are initialised. Spawn your entities and set
    * the active camera here.
    */
-  public abstract void onInit(World world, AppConfig config);
+  public abstract void onInit(World world, AppConfig config) throws Exception;
 
   /**
    * Called once after onInit. Build and return your full RenderPipeline here. The engine passes you

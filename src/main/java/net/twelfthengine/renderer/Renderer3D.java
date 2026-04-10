@@ -32,8 +32,8 @@ import org.lwjgl.opengl.GL30;
 
 public class Renderer3D {
 
-  private final int width;
-  private final int height;
+  private int width;
+  private int height;
   private float fovDegrees = 90f;
   private final MatrixStack3D modelStack = new MatrixStack3D();
 
@@ -746,4 +746,12 @@ public class Renderer3D {
     GL11.glVertex3f(-w, y, l);
     GL11.glEnd();
   }
+
+    /** Called by Window's resize callback — rebuilds projection next begin3D(). */
+    public void onResize(int newWidth, int newHeight) {
+        this.width  = newWidth;
+        this.height = newHeight;
+        // glViewport is already set by the Window callback.
+        // currentProj will be rebuilt on the next begin3D() call automatically.
+    }
 }

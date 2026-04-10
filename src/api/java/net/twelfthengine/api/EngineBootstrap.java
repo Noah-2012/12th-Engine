@@ -51,6 +51,7 @@ public class EngineBootstrap {
     window.init();
     window.lockMouse();
     window.setWindowIconFromResource("/app-icon.png");
+
     InputManager.init(window.getHandle());
     Logger.info("Startup", "Initialized InputManager and Window");
 
@@ -64,6 +65,8 @@ public class EngineBootstrap {
     renderer3D.setFovDegrees(config.rendererFov());
     renderer3D.setAntialiasing(config.enableAntialiasing());
     renderer3D.setMultisampling(config.enableMultisampling());
+
+    window.addResizeListener(renderer3D::onResize);
 
     // ------------------------------------------------------------------
     // World

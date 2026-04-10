@@ -7,21 +7,26 @@ import org.lwjgl.opengl.GL11;
 public class Renderer2D {
 
   private final Window window;
-  private final int width, height;
 
   public Renderer2D(Window window) {
     this.window = window;
-    this.width = window.getWidth();
-    this.height = window.getHeight();
+
 
     // begin2D();
   }
 
-  public int getWidth() {
-    return width;
-  }
+    public int getWidth() {
+        return window.getWidth();   // ← live, not stale
+    }
+
+    public int getHeight() {
+        return window.getHeight();  // ← add this too, callers will need it
+    }
 
   public void begin2D() {
+      int width = window.getWidth();  // ← read live each frame
+      int height = window.getHeight();
+
     GL11.glDisable(GL11.GL_DEPTH_TEST);
     GL11.glDisable(GL11.GL_LIGHTING);
     GL11.glEnable(GL11.GL_BLEND);
