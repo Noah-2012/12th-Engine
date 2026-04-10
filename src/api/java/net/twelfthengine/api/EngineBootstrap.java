@@ -64,9 +64,9 @@ public class EngineBootstrap {
         Renderer2D renderer2D   = new Renderer2D(window);
         Renderer3D renderer3D   = new Renderer3D(config.width(), config.height());
         TextRenderer textRenderer = new TextRenderer();
-        renderer3D.setFovDegrees(config.cullingTestCameraFovDegrees());
-        renderer3D.setAntialiasing(config.enableAntialiasing());
-        renderer3D.setMultisampling(config.enableMultisampling());
+        renderer3D.setFovDegrees(config.rendererFov());
+        renderer3D.getLegacy().setAntialiasing(config.enableAntialiasing());
+        renderer3D.getLegacy().setMultisampling(config.enableMultisampling());
 
         // ------------------------------------------------------------------
         // World

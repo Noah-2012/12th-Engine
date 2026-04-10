@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import net.twelfthengine.coord.iab.IAB;
 import net.twelfthengine.core.resources.TwelfthPackage;
 import net.twelfthengine.entity.BasicEntity;
 import net.twelfthengine.entity.ModelEntity;
@@ -15,6 +14,7 @@ import net.twelfthengine.entity.world.TextureEntity;
 import net.twelfthengine.math.Mat4;
 import net.twelfthengine.math.MatrixStack3D;
 import net.twelfthengine.math.Vec3;
+import net.twelfthengine.renderer.legacy.LegacyRenderer;
 import net.twelfthengine.renderer.mesh.PlaneMesh;
 import net.twelfthengine.renderer.mesh.TextureMesh;
 import net.twelfthengine.renderer.mesh.UnitCubeMesh;
@@ -31,98 +31,132 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL30;
 
+/**
+ * Renderer3D — the top-level 3D rendering orchestrator for 12th Engine.
+ *
+ * <p>Responsibilities of THIS class:
+ * <ul>
+ *   <li>Asset caching (OBJ, VBO, textures)</li>
+ *   <li>Frame setup: shadow pass → lit pass  (or legacy fallback)</li>
+ *   <li>Frustum culling</li>
+ *   <li>begin3D() — writes cached view/proj to both JOML fields and the GL matrix stack</li>
+ * </ul>
+ *
+ * <p>Responsibilities that live in their own subsystem:
+ * <ul>
+ *   <li>{@link LegacyRenderer} — everything that touches glBegin/glEnd, GL_LIGHTING,
+ *       fixed-function matrices, drawFilledBox, drawWireCube, etc.</li>
+ * </ul>
+ */
 public class Renderer3D {
+
+  // =============================
+  // CONFIGURATION
+  // =============================
 
   private final int width;
   private final int height;
   private float fovDegrees = 90f;
-  private final MatrixStack3D modelStack = new MatrixStack3D();
 
-  // Cache for loaded models to avoid reloading
-  private final Map<String, ObjModel> modelCache = new HashMap<>();
-  private final Map<String, VboModel> vboCache = new HashMap<>();
+  // =============================
+  // SUBSYSTEMS
+  // =============================
+
+  /** All fixed-function / OpenGL-legacy operations. */
+  private final LegacyRenderer legacy;
+
+  // =============================
+  // SHARED MESH GEOMETRY
+  // =============================
+
+  private final MatrixStack3D modelStack = new MatrixStack3D();
+  private UnitCubeMesh unitCubeMesh;
+  private PlaneMesh planeMesh;
+  private TextureMesh textureMesh;
+
+  // =============================
+  // SHADOW / LIT PIPELINE
+  // =============================
 
   private boolean shadowsEnabled;
   private ShaderProgram depthShader;
   private ShaderProgram litShader;
   private ShadowFramebuffer shadowFbo;
-  private UnitCubeMesh unitCubeMesh;
-  private PlaneMesh planeMesh;
-  private TextureMesh textureMesh;
-  private final Map<String, Integer> textureIdCache = new HashMap<>();
 
-  // Add these fields to Renderer3D:
+  // =============================
+  // CACHED MATRICES
+  // =============================
+
   private Matrix4f currentView = new Matrix4f();
   private Matrix4f currentProj = new Matrix4f();
-
-  private Matrix4f lastVP = new Matrix4f();
+  private Matrix4f lastVP      = new Matrix4f();
 
   public Matrix4f getLastVP() { return lastVP; }
 
+  // =============================
+  // ACTIVE FBO
+  // =============================
+
   private int activeFboId = 0;
 
-  public void setActiveFbo(int fboId) {
-    this.activeFboId = fboId;
-  }
+  public void setActiveFbo(int fboId) { this.activeFboId = fboId; }
+
+  // =============================
+  // FRUSTUM CULLING
+  // =============================
 
   private org.joml.FrustumIntersection frustum;
   private boolean frustumCullingEnabled = true;
 
-  public org.joml.FrustumIntersection getFrustum() {
-    return frustum;
-  }
+  public org.joml.FrustumIntersection getFrustum()                         { return frustum; }
+  public boolean isFrustumCullingEnabled()                                  { return frustumCullingEnabled; }
+  public void    setFrustumCullingEnabled(boolean frustumCullingEnabled)    { this.frustumCullingEnabled = frustumCullingEnabled; }
 
-  public boolean isFrustumCullingEnabled() {
-    return frustumCullingEnabled;
-  }
+  // =============================
+  // ASSET CACHES
+  // =============================
 
-  public void setFrustumCullingEnabled(boolean frustumCullingEnabled) {
-    this.frustumCullingEnabled = frustumCullingEnabled;
-  }
+  private final Map<String, ObjModel> modelCache     = new HashMap<>();
+  private final Map<String, VboModel> vboCache       = new HashMap<>();
+  private final Map<String, Integer>  textureIdCache = new HashMap<>();
 
-  public MatrixStack3D getMatrices() {
-    return modelStack;
-  }
+  // =============================
+  // ACCESSORS
+  // =============================
 
-  public UnitCubeMesh getUnitCubeMesh() {
-    return unitCubeMesh;
-  }
+  public MatrixStack3D getMatrices()      { return modelStack;    }
+  public UnitCubeMesh  getUnitCubeMesh()  { return unitCubeMesh;  }
+  public PlaneMesh     getPlaneMesh()     { return planeMesh;     }
+  public TextureMesh   getTextureMesh()   { return textureMesh;   }
 
-  public PlaneMesh getPlaneMesh() {
-    return planeMesh;
-  }
-
-  public TextureMesh getTextureMesh() {
-    return textureMesh;
-  }
+  /** Exposes the legacy subsystem so game code can call drawLine, drawAxes, etc. */
+  public LegacyRenderer getLegacy()       { return legacy;        }
 
   public void setFovDegrees(float fovDegrees) {
     this.fovDegrees = Math.max(30f, Math.min(150f, fovDegrees));
   }
 
+  // =============================
+  // CONSTRUCTION
+  // =============================
+
   public Renderer3D(int width, int height) {
-    this.width = width;
+    this.width  = width;
     this.height = height;
+
     GL11.glEnable(GL11.GL_DEPTH_TEST);
 
-    // Einfaches Licht-Setup
-    GL11.glEnable(GL11.GL_LIGHTING);
-    GL11.glEnable(GL11.GL_LIGHT0);
-    GL11.glEnable(GL11.GL_COLOR_MATERIAL); // Damit setColor() weiterhin funktioniert
-
-    // Position des Lichts (W=1.0 für Positionslicht, W=0.0 für gerichtetes Licht wie Sonne)
-    float[] lightPos = {0f, 10f, 10f, 1.0f};
-    java.nio.FloatBuffer buffer = org.lwjgl.BufferUtils.createFloatBuffer(4).put(lightPos);
-    buffer.flip();
-    GL11.glLightfv(GL11.GL_LIGHT0, GL11.GL_POSITION, buffer);
+    // Boot the legacy subsystem and let it own its own GL state.
+    legacy = new LegacyRenderer();
+    legacy.initLegacyLighting();
 
     try {
-      depthShader = new ShaderProgram("/shaders/shadow_depth.vert", "/shaders/shadow_depth.frag");
-      litShader = new ShaderProgram("/shaders/lit_shadow.vert", "/shaders/lit_shadow.frag");
-      shadowFbo = new ShadowFramebuffer();
+      depthShader  = new ShaderProgram("/shaders/shadow_depth.vert", "/shaders/shadow_depth.frag");
+      litShader    = new ShaderProgram("/shaders/lit_shadow.vert",   "/shaders/lit_shadow.frag");
+      shadowFbo    = new ShadowFramebuffer();
       unitCubeMesh = new UnitCubeMesh();
-      planeMesh = new PlaneMesh();
-      textureMesh = new TextureMesh();
+      planeMesh    = new PlaneMesh();
+      textureMesh  = new TextureMesh();
       shadowsEnabled = true;
     } catch (Exception e) {
       System.err.println("[Renderer3D] Shader shadows disabled: " + e.getMessage());
@@ -131,14 +165,13 @@ public class Renderer3D {
   }
 
   // =============================
-  // MODEL LOADING
+  // ASSET LOADING
   // =============================
 
   public ObjModel loadObjModel(String path) {
     if (!modelCache.containsKey(path)) {
       try {
-        ObjModel model = ObjLoader.load(path);
-        modelCache.put(path, model);
+        modelCache.put(path, ObjLoader.load(path));
       } catch (IOException e) {
         System.err.println("Failed to load model: " + path);
         return null;
@@ -149,56 +182,49 @@ public class Renderer3D {
 
   public VboModel loadVboModel(String path) {
     if (!vboCache.containsKey(path)) {
-      ObjModel objModel = loadObjModel(path);
-      if (objModel != null) {
-        VboModel vboModel = new VboModel(objModel);
-        vboCache.put(path, vboModel);
-      }
+      ObjModel obj = loadObjModel(path);
+      if (obj != null) vboCache.put(path, new VboModel(obj));
     }
     return vboCache.get(path);
   }
 
   public ObjModel loadObjModelFromPackage(TwelfthPackage pack, String internalPath) {
-    String cacheKey = pack.getArchiveName() + ":" + internalPath;
-    if (!modelCache.containsKey(cacheKey)) {
+    String key = pack.getArchiveName() + ":" + internalPath;
+    if (!modelCache.containsKey(key)) {
       try {
-        ObjModel model = ObjLoader.loadFromPackage(pack, internalPath);
-        modelCache.put(cacheKey, model);
+        modelCache.put(key, ObjLoader.loadFromPackage(pack, internalPath));
       } catch (IOException e) {
         System.err.println("Failed to load model from package: " + internalPath);
         return null;
       }
     }
-    return modelCache.get(cacheKey);
+    return modelCache.get(key);
   }
 
   public VboModel loadVboModelFromPackage(TwelfthPackage pack, String internalPath) {
-    String cacheKey = pack.getArchiveName() + ":" + internalPath;
-    if (!vboCache.containsKey(cacheKey)) {
-      ObjModel objModel = loadObjModelFromPackage(pack, internalPath);
-      if (objModel != null) {
-        VboModel vboModel = new VboModel(objModel);
-        vboCache.put(cacheKey, vboModel);
-      }
+    String key = pack.getArchiveName() + ":" + internalPath;
+    if (!vboCache.containsKey(key)) {
+      ObjModel obj = loadObjModelFromPackage(pack, internalPath);
+      if (obj != null) vboCache.put(key, new VboModel(obj));
     }
-    return vboCache.get(cacheKey);
+    return vboCache.get(key);
   }
 
   public int loadTextureId(String path) {
     if (!textureIdCache.containsKey(path)) {
-      int id = TextureLoader.loadTexture(path);
-      textureIdCache.put(path, id);
+      textureIdCache.put(path, TextureLoader.loadTexture(path));
     }
     return textureIdCache.get(path);
   }
 
   // =============================
-  // MAIN RENDER ENTRY
+  // FRAME ENTRY POINT
   // =============================
 
   public void render(World world) {
-    CameraEntity cam = world.getActiveCamera();
-    LightEntity shadowLight = world.getPrimaryShadowLight();
+    CameraEntity cam         = world.getActiveCamera();
+    LightEntity  shadowLight = world.getPrimaryShadowLight();
+
     Matrix4f lightSpaceMatrix =
             (shadowsEnabled && shadowLight != null && shadowLight.isCastShadows())
                     ? computeLightSpaceMatrix(shadowLight)
@@ -206,12 +232,9 @@ public class Renderer3D {
 
     if (lightSpaceMatrix != null) {
       renderShadowPass(world, lightSpaceMatrix);
-      // Restore to the known active FBO — no driver query needed
       GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, activeFboId);
       GL11.glViewport(0, 0, width, height);
     }
-
-    //begin3D(cam);
 
     if (lightSpaceMatrix != null) {
       renderLitScene(world, shadowLight, lightSpaceMatrix);
@@ -220,17 +243,52 @@ public class Renderer3D {
     }
   }
 
+  // =============================
+  // BEGIN FRAME
+  // =============================
+
+  /**
+   * Computes and caches the view + projection matrices, pushes them into the
+   * fixed-function GL stack (so legacy draw calls still work), and rebuilds
+   * the frustum.
+   */
+  public void begin3D(CameraEntity cam) {
+    float aspect = (float) width / height;
+    currentProj = new Matrix4f().perspective(
+            (float) Math.toRadians(fovDegrees), aspect, 0.1f, 1000f);
+
+    Vec3 pos = cam.getPosition();
+    currentView = new Matrix4f()
+            .rotateX((float) Math.toRadians(cam.getPitch()))
+            .rotateY((float) Math.toRadians(cam.getYaw()))
+            .translate(-pos.x(), -pos.y(), -pos.z());
+
+    lastVP  = new Matrix4f(currentProj).mul(currentView);
+    frustum = new org.joml.FrustumIntersection(lastVP);
+
+    // Keep the fixed-function stack in sync so legacy calls are correct.
+    FloatBuffer pb = BufferUtils.createFloatBuffer(16);
+    currentProj.get(pb);
+    GL11.glMatrixMode(GL11.GL_PROJECTION);
+    GL11.glLoadMatrixf(pb);
+
+    FloatBuffer vb = BufferUtils.createFloatBuffer(16);
+    currentView.get(vb);
+    GL11.glMatrixMode(GL11.GL_MODELVIEW);
+    GL11.glLoadMatrixf(vb);
+  }
+
+  // =============================
+  // SHADOW PASS
+  // =============================
+
   private Matrix4f computeLightSpaceMatrix(LightEntity light) {
     Vec3 p = light.getPosition();
-    Vec3 f = light.getForwardDirection();
-    Vec3 sceneCenter = new Vec3(0f, 0f, 0f);
-    Matrix4f lightView =
-        new Matrix4f()
-            .lookAt(
-                p.x(), p.y(), p.z(), sceneCenter.x(), sceneCenter.y(), sceneCenter.z(), 0f, 1f, 0f);
+    Matrix4f lightView = new Matrix4f().lookAt(
+            p.x(), p.y(), p.z(), 0f, 0f, 0f, 0f, 1f, 0f);
     float s = light.getShadowOrthoHalfSize();
-    Matrix4f lightProj =
-        new Matrix4f().ortho(-s, s, -s, s, light.getShadowNear(), light.getShadowFar());
+    Matrix4f lightProj = new Matrix4f().ortho(
+            -s, s, -s, s, light.getShadowNear(), light.getShadowFar());
     return new Matrix4f(lightProj).mul(lightView);
   }
 
@@ -249,24 +307,14 @@ public class Renderer3D {
 
     depthShader.use();
 
-    org.joml.FrustumIntersection frustum = new org.joml.FrustumIntersection(lightSpace);
+    org.joml.FrustumIntersection lightFrustum = new org.joml.FrustumIntersection(lightSpace);
 
     for (BasicEntity e : world.getEntities()) {
       if (e instanceof LightEntity || e instanceof CameraEntity) continue;
 
-      // Frustum Culling
-      float radius = e.getCollisionRadius();
-      if (e instanceof ModelEntity me) {
-        radius = me.getModelBoundingRadius() * me.getSize();
-      } else if (e instanceof BasicPlaneEntity plane) {
-        radius = Math.max(plane.getWidth(), plane.getLength());
-      } else if (e instanceof TextureEntity te) {
-        radius = Math.max(te.getWidth(), te.getHeight());
-      }
-
+      float radius = boundingRadius(e);
       if (frustumCullingEnabled
-          && !frustum.testSphere(
-              e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
+              && !lightFrustum.testSphere(e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
         continue;
       }
 
@@ -277,73 +325,43 @@ public class Renderer3D {
 
     depthShader.unbind();
     GL11.glDisable(GL11.GL_POLYGON_OFFSET_FILL);
-    // GL11.glCullFace(GL11.GL_BACK);
-
-    // this is new
     GL11.glDisable(GL11.GL_CULL_FACE);
   }
 
-  public Matrix4f modelMatrixForPlane(BasicPlaneEntity plane) {
-    float y = plane.getTop();
-    float w = plane.getWidth();
-    float l = plane.getLength();
-    return new Matrix4f().translate(0f, y, 0f).scale(w, 1f, l);
-  }
-
-  public Matrix4f modelMatrixForModel(ModelEntity me, VboModel vbo) {
-    Vec3 p = me.getPosition();
-    Vec3 rot = me.getRotation();
-    float s = me.getSize();
-    return new Matrix4f()
-        .translate(p.x(), p.y(), p.z())
-        .rotateZ((float) Math.toRadians(rot.z()))
-        .rotateY((float) Math.toRadians(rot.y()))
-        .rotateX((float) Math.toRadians(rot.x()))
-        .scale(s);
-  }
+  // =============================
+  // LIT (MODERN) SCENE
+  // =============================
 
   private void renderLitScene(World world, LightEntity light, Matrix4f lightSpace) {
     GL11.glDisable(GL11.GL_LIGHTING);
     litShader.use();
 
-    // Use cached matrices directly — remove ALL glGetFloatv calls
-    Matrix4f view = currentView;
-    Matrix4f proj = currentProj;
+    Vec3  toLight = light.getDirectionToLightWorld().mul(-1f);
+    Vec3  lc      = light.getColor();
+    float inten   = light.getIntensity();
 
-    Vec3 toLight = light.getDirectionToLightWorld().mul(-1f);
-    Vec3 lc = light.getColor();
-    float inten = light.getIntensity();
     litShader.setUniform3f("uLightDirWorld", toLight.x(), toLight.y(), toLight.z());
-    litShader.setUniform3f("uLightColor", lc.x() * inten, lc.y() * inten, lc.z() * inten);
-    litShader.setUniform3f("uAmbient", 0.1f, 0.11f, 0.14f);
-    litShader.setUniform1i("uDiffuseTex", 0);
-    litShader.setUniform1i("uShadowMap", 1);
+    litShader.setUniform3f("uLightColor",    lc.x() * inten, lc.y() * inten, lc.z() * inten);
+    litShader.setUniform3f("uAmbient",       0.1f, 0.11f, 0.14f);
+    litShader.setUniform1i("uDiffuseTex",    0);
+    litShader.setUniform1i("uShadowMap",     1);
 
     GL13.glActiveTexture(GL13.GL_TEXTURE1);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, shadowFbo.getDepthTextureId());
 
-    this.frustum = new org.joml.FrustumIntersection(new Matrix4f(proj).mul(view));
+    this.frustum = new org.joml.FrustumIntersection(new Matrix4f(currentProj).mul(currentView));
 
     for (BasicEntity e : world.getEntities()) {
       if (e instanceof LightEntity || e instanceof CameraEntity) continue;
 
-      float radius = e.getCollisionRadius();
-      if (e instanceof ModelEntity me) {
-        radius = me.getModelBoundingRadius() * me.getSize();
-      } else if (e instanceof BasicPlaneEntity plane) {
-        radius = Math.max(plane.getWidth(), plane.getLength());
-      } else if (e instanceof TextureEntity te) {
-        radius = Math.max(te.getWidth(), te.getHeight());
-      }
-
+      float radius = boundingRadius(e);
       if (frustumCullingEnabled
-              && !frustum.testSphere(
-              e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
+              && !frustum.testSphere(e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
         continue;
       }
 
       if (e instanceof Renderable3D renderable) {
-        renderable.renderLit(this, litShader, view, proj, lightSpace);
+        renderable.renderLit(this, litShader, currentView, currentProj, lightSpace);
       }
     }
 
@@ -354,369 +372,47 @@ public class Renderer3D {
     GL11.glEnable(GL11.GL_LIGHTING);
   }
 
+  // =============================
+  // LEGACY SCENE (delegates to LegacyRenderer)
+  // =============================
+
   private void renderLegacyScene(World world) {
-    for (BasicEntity e : world.getEntities()) {
-      if (e instanceof LightEntity || e instanceof CameraEntity) continue;
-
-      if (e instanceof BasicPlaneEntity plane) {
-        /*
-        float y = plane.getTop();
-        float w = plane.getWidth() / 2f;
-        float l = plane.getLength() / 2f;
-        setColor(0.7f, 0.7f, 0.7f, 1f);
-        drawFilledBox(
-                new Vec3(-w, y - 0.05f, -l),
-                new Vec3(w, y, l)
-        );
-        */
-        GL11.glCullFace(GL11.GL_FRONT);
-        drawPlane(plane);
-      } else if (e instanceof ModelEntity modelEntity) {
-        renderModelEntity(modelEntity);
-      } else if (e instanceof TextureEntity te) {
-        String path = te.getTexturePath();
-        if (path == null || path.isEmpty()) continue;
-        int texId = loadTextureId(path);
-
-        GL11.glPushMatrix();
-        GL11.glTranslatef(te.getPosition().x(), te.getPosition().y(), te.getPosition().z());
-        GL11.glRotatef(te.getRotation().y(), 0, 1, 0);
-        GL11.glRotatef(te.getRotation().x(), 1, 0, 0);
-        GL11.glScalef(te.getWidth(), te.getHeight(), 1f);
-
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-
-        setColor(1f, 1f, 1f, 1f);
-
-        GL11.glBegin(GL11.GL_QUADS);
-        GL11.glNormal3f(0, 0, 1);
-        GL11.glTexCoord2f(0, 0);
-        GL11.glVertex3f(-0.5f, -0.5f, 0);
-        GL11.glTexCoord2f(1, 0);
-        GL11.glVertex3f(0.5f, -0.5f, 0);
-        GL11.glTexCoord2f(1, 1);
-        GL11.glVertex3f(0.5f, 0.5f, 0);
-        GL11.glTexCoord2f(0, 1);
-        GL11.glVertex3f(-0.5f, 0.5f, 0);
-        GL11.glEnd();
-
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glPopMatrix();
-      }
-    }
+    LegacyRenderer.ModelRenderer   modelRenderer   = new LegacyRenderer.ModelRenderer(this::loadVboModel, this::loadObjModel);
+    LegacyRenderer.TextureRenderer textureRenderer = new LegacyRenderer.TextureRenderer(this::loadTextureId);
+    legacy.renderScene(world, modelRenderer, textureRenderer);
   }
 
   // =============================
-  // MODEL ENTITY RENDERING
+  // MATRIX HELPERS (used by Renderable3D implementations)
   // =============================
 
-  private void renderModelEntity(ModelEntity modelEntity) {
-    String modelPath = modelEntity.getModelPath();
-    if (modelPath == null || modelPath.isEmpty()) return;
+  public Matrix4f modelMatrixForPlane(BasicPlaneEntity plane) {
+    return new Matrix4f()
+            .translate(0f, plane.getTop(), 0f)
+            .scale(plane.getWidth(), 1f, plane.getLength());
+  }
 
-    VboModel vboModel = loadVboModel(modelPath);
-    ObjModel objModel = loadObjModel(modelPath);
-
-    if (objModel == null) {
-      System.err.println("[Shadow] Failed to load model from package: " + modelPath);
-    }
-
-    if (vboModel == null) {
-      System.err.println("[Shadow] VBO not created for: " + modelPath);
-    }
-
-    if (vboModel == null || objModel == null) return;
-
-    GL11.glPushMatrix();
-
-    // Apply transformations
-    Vec3 position = modelEntity.getPosition();
-    GL11.glTranslatef(position.x(), position.y(), position.z());
-
-    // Apply rotation
-    Vec3 rot = modelEntity.getRotation();
-    if (rot.z() != 0) GL11.glRotatef(rot.z(), 0, 0, 1);
-    if (rot.y() != 0) GL11.glRotatef(rot.y(), 0, 1, 0);
-    if (rot.x() != 0) GL11.glRotatef(rot.x(), 1, 0, 0);
-
-    // Apply scale based on size
-    float size = modelEntity.getSize();
-    GL11.glScalef(size, size, size);
-
-    // Render the model
-    vboModel.render(objModel);
-
-    GL11.glPopMatrix();
+  public Matrix4f modelMatrixForModel(ModelEntity me, VboModel vbo) {
+    Vec3 p   = me.getPosition();
+    Vec3 rot = me.getRotation();
+    float s  = me.getSize();
+    return new Matrix4f()
+            .translate(p.x(), p.y(), p.z())
+            .rotateZ((float) Math.toRadians(rot.z()))
+            .rotateY((float) Math.toRadians(rot.y()))
+            .rotateX((float) Math.toRadians(rot.x()))
+            .scale(s);
   }
 
   // =============================
-  // BEGIN FRAME
+  // PRIVATE UTILITY
   // =============================
 
-  public void begin3D(CameraEntity cam) {
-    float aspect = (float) width / height;
-    currentProj = new Matrix4f().perspective(
-            (float) Math.toRadians(fovDegrees), aspect, 0.1f, 1000f);
-
-    Vec3 pos = cam.getPosition();
-    currentView = new Matrix4f()
-            .rotateX((float) Math.toRadians(cam.getPitch()))
-            .rotateY((float) Math.toRadians(cam.getYaw()))
-            .translate(-pos.x(), -pos.y(), -pos.z());
-
-    lastVP = new Matrix4f(currentProj).mul(currentView);
-
-    // --- DEFINITIVE TEST ---
-    // Extract the forward vector from the view matrix to see where camera points
-    // Row 2 of the view matrix is the forward vector
-    float fx = currentView.m02();
-    float fy = currentView.m12();
-    float fz = currentView.m22();
-    System.out.println("[CAM] pitch=" + cam.getPitch()
-            + " yaw=" + cam.getYaw()
-            + " forward=(" + fx + "," + fy + "," + fz + ")"
-            + " viewDet=" + currentView.determinant()
-            + " projDet=" + currentProj.determinant());
-    // --- END TEST ---
-
-    FloatBuffer pb = BufferUtils.createFloatBuffer(16);
-    currentProj.get(pb);
-    GL11.glMatrixMode(GL11.GL_PROJECTION);
-    GL11.glLoadMatrixf(pb);
-
-    FloatBuffer vb = BufferUtils.createFloatBuffer(16);
-    currentView.get(vb);
-    GL11.glMatrixMode(GL11.GL_MODELVIEW);
-    GL11.glLoadMatrixf(vb);
-  }
-
-  // =============================
-  // CAMERA
-  // =============================
-
-  private void applyCamera(CameraEntity cam) {
-    Vec3 pos = cam.getPosition();
-
-    // Build view matrix explicitly — no matrix order ambiguity
-    Matrix4f view = new Matrix4f()
-            .rotateX((float) Math.toRadians(cam.getPitch()))
-            .rotateY((float) Math.toRadians(cam.getYaw()))
-            .translate(-pos.x(), -pos.y(), -pos.z());
-
-    FloatBuffer buf = BufferUtils.createFloatBuffer(16);
-    view.get(buf);
-    GL11.glLoadMatrixf(buf);
-  }
-
-  // =============================
-  // UTILITY: COLORS & STATE & ANTIALIASING
-  // =============================
-
-  public void setColor(float r, float g, float b, float a) {
-    GL11.glColor4f(r, g, b, a);
-  }
-
-  public void setPointSize(float size) {
-    GL11.glPointSize(size);
-  }
-
-  public void setLineWidth(float width) {
-    GL11.glLineWidth(width);
-  }
-
-  public void setAntialiasing(boolean enabled) {
-    if (enabled) {
-      // Aktiviert das Glätten von Kanten (besonders für Linien und Punkte wichtig)
-      GL11.glEnable(GL11.GL_LINE_SMOOTH);
-      GL11.glEnable(GL11.GL_POINT_SMOOTH);
-      GL11.glEnable(GL11.GL_BLEND); // Blend benötigt für weiche Kanten
-      GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-
-      // Sagt der Grafikkarte, sie soll auf Qualität statt Geschwindigkeit setzen
-      GL11.glHint(GL11.GL_LINE_SMOOTH_HINT, GL11.GL_NICEST);
-      GL11.glHint(GL11.GL_POINT_SMOOTH_HINT, GL11.GL_NICEST);
-    } else {
-      GL11.glDisable(GL11.GL_LINE_SMOOTH);
-      GL11.glDisable(GL11.GL_POINT_SMOOTH);
-      GL11.glDisable(GL11.GL_BLEND);
-    }
-  }
-
-  public void setMultisampling(boolean enabled) {
-    // Funktioniert nur, wenn das Window mit Samples initialisiert wurde!
-    if (enabled) {
-      GL11.glEnable(0x809D); // GL_MULTISAMPLE
-    } else {
-      GL11.glDisable(0x809D);
-    }
-  }
-
-  // =============================
-  // DRAWING PRIMITIVES
-  // =============================
-
-  /** Draws a simple point in 3D space */
-  public void drawPoint(Vec3 p) {
-    GL11.glBegin(GL11.GL_POINTS);
-    GL11.glVertex3f(p.x(), p.y(), p.z());
-    GL11.glEnd();
-  }
-
-  public void drawLine(Vec3 a, Vec3 b) {
-    GL11.glBegin(GL11.GL_LINES);
-    GL11.glVertex3f(a.x(), a.y(), a.z());
-    GL11.glVertex3f(b.x(), b.y(), b.z());
-    GL11.glEnd();
-  }
-
-  /** Draws a wireframe cube at a specific position with a specific scale */
-  public void drawWireCube(Vec3 pos, float size) {
-    float s = size / 2f;
-    GL11.glPushMatrix();
-    GL11.glTranslatef(pos.x(), pos.y(), pos.z());
-
-    GL11.glBegin(GL11.GL_LINE_LOOP); // Top
-    GL11.glVertex3f(-s, s, -s);
-    GL11.glVertex3f(s, s, -s);
-    GL11.glVertex3f(s, s, s);
-    GL11.glVertex3f(-s, s, s);
-    GL11.glEnd();
-
-    GL11.glBegin(GL11.GL_LINE_LOOP); // Bottom
-    GL11.glVertex3f(-s, -s, -s);
-    GL11.glVertex3f(s, -s, -s);
-    GL11.glVertex3f(s, -s, s);
-    GL11.glVertex3f(-s, -s, s);
-    GL11.glEnd();
-
-    GL11.glBegin(GL11.GL_LINES); // Verticals
-    GL11.glVertex3f(-s, -s, -s);
-    GL11.glVertex3f(-s, s, -s);
-    GL11.glVertex3f(s, -s, -s);
-    GL11.glVertex3f(s, s, -s);
-    GL11.glVertex3f(s, -s, s);
-    GL11.glVertex3f(s, s, s);
-    GL11.glVertex3f(-s, -s, s);
-    GL11.glVertex3f(-s, s, s);
-    GL11.glEnd();
-
-    GL11.glPopMatrix();
-  }
-
-  /** Draws a filled box (useful for simple blocks/entities) */
-  public void drawFilledBox(Vec3 min, Vec3 max) {
-    GL11.glBegin(GL11.GL_QUADS);
-    // Front Face (Z+)
-    GL11.glNormal3d(0.0, 0.0, 1.0);
-    GL11.glVertex3f(min.x(), min.y(), max.z());
-    GL11.glVertex3f(max.x(), min.y(), max.z());
-    GL11.glVertex3f(max.x(), max.y(), max.z());
-    GL11.glVertex3f(min.x(), max.y(), max.z());
-    // Back Face (Z-)
-    GL11.glNormal3d(0.0, 0.0, -1.0);
-    GL11.glVertex3f(min.x(), min.y(), min.z());
-    GL11.glVertex3f(min.x(), max.y(), min.z());
-    GL11.glVertex3f(max.x(), max.y(), min.z());
-    GL11.glVertex3f(max.x(), min.y(), min.z());
-    // Top Face (Y+)
-    GL11.glNormal3d(0.0, 1.0, 0.0);
-    GL11.glVertex3f(min.x(), max.y(), min.z());
-    GL11.glVertex3f(min.x(), max.y(), max.z());
-    GL11.glVertex3f(max.x(), max.y(), max.z());
-    GL11.glVertex3f(max.x(), max.y(), min.z());
-    // Bottom Face (Y-)
-    GL11.glNormal3d(0.0, -1.0, 0.0);
-    GL11.glVertex3f(min.x(), min.y(), min.z());
-    GL11.glVertex3f(max.x(), min.y(), min.z());
-    GL11.glVertex3f(max.x(), min.y(), max.z());
-    GL11.glVertex3f(min.x(), min.y(), max.z());
-    // Right Face (X+)
-    GL11.glNormal3d(1.0, 0.0, 0.0);
-    GL11.glVertex3f(max.x(), min.y(), min.z());
-    GL11.glVertex3f(max.x(), max.y(), min.z());
-    GL11.glVertex3f(max.x(), max.y(), max.z());
-    GL11.glVertex3f(max.x(), min.y(), max.z());
-    // Left Face (X-)
-    GL11.glNormal3d(-1.0, 0.0, 0.0);
-    GL11.glVertex3f(min.x(), min.y(), min.z());
-    GL11.glVertex3f(min.x(), min.y(), max.z());
-    GL11.glVertex3f(min.x(), max.y(), max.z());
-    GL11.glVertex3f(min.x(), max.y(), min.z());
-    GL11.glEnd();
-  }
-
-  // =============================
-  // DEBUG HELPERS
-  // =============================
-
-  /** Draws the world axes (X=Red, Y=Green, Z=Blue) */
-  public void drawAxes(float length) {
-    setLineWidth(2.0f);
-    // X
-    setColor(1, 0, 0, 1);
-    drawLine(new Vec3(0, 0, 0), new Vec3(length, 0, 0));
-    // Y
-    setColor(0, 1, 0, 1);
-    drawLine(new Vec3(0, 0, 0), new Vec3(0, length, 0));
-    // Z
-    setColor(0, 0, 1, 1);
-    drawLine(new Vec3(0, 0, 0), new Vec3(0, 0, length));
-    setColor(1, 1, 1, 1); // Reset to white
-  }
-
-  // =============================
-  // DEBUG WORLD BOUNDS
-  // =============================
-
-  private void drawIAB(IAB box) {
-    float w = box.getWidth() / 2f;
-    float h = box.getHeight() / 2f;
-    float d = box.getDepth() / 2f;
-
-    Vec3[] p = {
-      new Vec3(-w, -h, -d),
-      new Vec3(w, -h, -d),
-      new Vec3(w, h, -d),
-      new Vec3(-w, h, -d),
-      new Vec3(-w, -h, d),
-      new Vec3(w, -h, d),
-      new Vec3(w, h, d),
-      new Vec3(-w, h, d),
-    };
-
-    int[][] edges = {
-      {0, 1},
-      {1, 2},
-      {2, 3},
-      {3, 0},
-      {4, 5},
-      {5, 6},
-      {6, 7},
-      {7, 4},
-      {0, 4},
-      {1, 5},
-      {2, 6},
-      {3, 7},
-    };
-
-    for (int[] e : edges) drawLine(p[e[0]], p[e[1]]);
-  }
-
-  public void drawPlane(BasicPlaneEntity plane) {
-    float w = plane.getWidth() / 2f;
-    float l = plane.getLength() / 2f;
-    float y = plane.getTop();
-
-    GL11.glBegin(GL11.GL_QUADS);
-    GL11.glNormal3f(0f, 1f, 0f);
-    GL11.glVertex3f(-w, y, -l);
-    GL11.glVertex3f(w, y, -l);
-    GL11.glVertex3f(w, y, l);
-    GL11.glVertex3f(-w, y, l);
-    GL11.glEnd();
+  /** Returns an approximate bounding sphere radius for frustum culling. */
+  private float boundingRadius(BasicEntity e) {
+    if (e instanceof ModelEntity me)          return me.getModelBoundingRadius() * me.getSize();
+    if (e instanceof BasicPlaneEntity plane)  return Math.max(plane.getWidth(), plane.getLength());
+    if (e instanceof TextureEntity te)        return Math.max(te.getWidth(), te.getHeight());
+    return e.getCollisionRadius();
   }
 }
