@@ -12,6 +12,7 @@ import net.twelfthengine.entity.camera.CameraEntity;
 import net.twelfthengine.entity.world.BasicPlaneEntity;
 import net.twelfthengine.entity.world.LightEntity;
 import net.twelfthengine.entity.world.TextureEntity;
+import net.twelfthengine.math.Mat4;
 import net.twelfthengine.math.MatrixStack3D;
 import net.twelfthengine.math.Vec3;
 import net.twelfthengine.renderer.mesh.PlaneMesh;
@@ -32,8 +33,8 @@ import org.lwjgl.opengl.GL30;
 
 public class Renderer3D {
 
-  private int width;
-  private int height;
+  private final int width;
+  private final int height;
   private float fovDegrees = 90f;
   private final MatrixStack3D modelStack = new MatrixStack3D();
 
@@ -56,9 +57,7 @@ public class Renderer3D {
 
   private Matrix4f lastVP = new Matrix4f();
 
-  public Matrix4f getLastVP() {
-    return lastVP;
-  }
+  public Matrix4f getLastVP() { return lastVP; }
 
   private int activeFboId = 0;
 
@@ -201,9 +200,9 @@ public class Renderer3D {
     CameraEntity cam = world.getActiveCamera();
     LightEntity shadowLight = world.getPrimaryShadowLight();
     Matrix4f lightSpaceMatrix =
-        (shadowsEnabled && shadowLight != null && shadowLight.isCastShadows())
-            ? computeLightSpaceMatrix(shadowLight)
-            : null;
+            (shadowsEnabled && shadowLight != null && shadowLight.isCastShadows())
+                    ? computeLightSpaceMatrix(shadowLight)
+                    : null;
 
     if (lightSpaceMatrix != null) {
       renderShadowPass(world, lightSpaceMatrix);
@@ -212,7 +211,7 @@ public class Renderer3D {
       GL11.glViewport(0, 0, width, height);
     }
 
-    // begin3D(cam);
+    //begin3D(cam);
 
     if (lightSpaceMatrix != null) {
       renderLitScene(world, shadowLight, lightSpaceMatrix);
@@ -237,13 +236,6 @@ public class Renderer3D {
 
   private void renderShadowPass(World world, Matrix4f lightSpace) {
     shadowFbo.bindForShadowPass();
-
-    GL11.glMatrixMode(GL11.GL_PROJECTION);
-    GL11.glPushMatrix();
-    GL11.glLoadIdentity(); // Schatten nutzt meist keine Standard-Projection
-
-    GL11.glMatrixMode(GL11.GL_MODELVIEW);
-    GL11.glPushMatrix();
 
     int status = GL30.glCheckFramebufferStatus(GL30.GL_FRAMEBUFFER);
     if (status != GL30.GL_FRAMEBUFFER_COMPLETE) {
@@ -284,12 +276,6 @@ public class Renderer3D {
     }
 
     depthShader.unbind();
-
-    GL11.glMatrixMode(GL11.GL_PROJECTION);
-    GL11.glPopMatrix();
-    GL11.glMatrixMode(GL11.GL_MODELVIEW);
-    GL11.glPopMatrix();
-
     GL11.glDisable(GL11.GL_POLYGON_OFFSET_FILL);
     // GL11.glCullFace(GL11.GL_BACK);
 
@@ -351,7 +337,7 @@ public class Renderer3D {
       }
 
       if (frustumCullingEnabled
-          && !frustum.testSphere(
+              && !frustum.testSphere(
               e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
         continue;
       }
@@ -473,12 +459,11 @@ public class Renderer3D {
 
   public void begin3D(CameraEntity cam) {
     float aspect = (float) width / height;
-    currentProj =
-        new Matrix4f().perspective((float) Math.toRadians(fovDegrees), aspect, 0.1f, 1000f);
+    currentProj = new Matrix4f().perspective(
+            (float) Math.toRadians(fovDegrees), aspect, 0.1f, 1000f);
 
     Vec3 pos = cam.getPosition();
-    currentView =
-        new Matrix4f()
+    currentView = new Matrix4f()
             .rotateX((float) Math.toRadians(cam.getPitch()))
             .rotateY((float) Math.toRadians(cam.getYaw()))
             .translate(-pos.x(), -pos.y(), -pos.z());
@@ -491,22 +476,11 @@ public class Renderer3D {
     float fx = currentView.m02();
     float fy = currentView.m12();
     float fz = currentView.m22();
-    System.out.println(
-        "[CAM] pitch="
-            + cam.getPitch()
-            + " yaw="
-            + cam.getYaw()
-            + " forward=("
-            + fx
-            + ","
-            + fy
-            + ","
-            + fz
-            + ")"
-            + " viewDet="
-            + currentView.determinant()
-            + " projDet="
-            + currentProj.determinant());
+    System.out.println("[CAM] pitch=" + cam.getPitch()
+            + " yaw=" + cam.getYaw()
+            + " forward=(" + fx + "," + fy + "," + fz + ")"
+            + " viewDet=" + currentView.determinant()
+            + " projDet=" + currentProj.determinant());
     // --- END TEST ---
 
     FloatBuffer pb = BufferUtils.createFloatBuffer(16);
@@ -528,8 +502,7 @@ public class Renderer3D {
     Vec3 pos = cam.getPosition();
 
     // Build view matrix explicitly — no matrix order ambiguity
-    Matrix4f view =
-        new Matrix4f()
+    Matrix4f view = new Matrix4f()
             .rotateX((float) Math.toRadians(cam.getPitch()))
             .rotateY((float) Math.toRadians(cam.getYaw()))
             .translate(-pos.x(), -pos.y(), -pos.z());
@@ -746,12 +719,4 @@ public class Renderer3D {
     GL11.glVertex3f(-w, y, l);
     GL11.glEnd();
   }
-
-    /** Called by Window's resize callback — rebuilds projection next begin3D(). */
-    public void onResize(int newWidth, int newHeight) {
-        this.width  = newWidth;
-        this.height = newHeight;
-        // glViewport is already set by the Window callback.
-        // currentProj will be rebuilt on the next begin3D() call automatically.
-    }
 }

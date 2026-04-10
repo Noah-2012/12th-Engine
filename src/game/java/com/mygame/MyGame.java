@@ -3,7 +3,6 @@ package com.mygame;
 import net.twelfthengine.api.AppConfig;
 import net.twelfthengine.api.EngineBootstrap;
 import net.twelfthengine.api.TwelfthApp;
-import net.twelfthengine.controls.InputManager;
 import net.twelfthengine.core.resources.ResourceExtractor;
 import net.twelfthengine.core.resources.TwelfthPackage;
 import net.twelfthengine.entity.BasicEntity;
@@ -13,42 +12,44 @@ import net.twelfthengine.entity.world.BasicPlaneEntity;
 import net.twelfthengine.entity.world.LightEntity;
 import net.twelfthengine.entity.world.TextureEntity;
 import net.twelfthengine.math.Vec3;
-import net.twelfthengine.qgui.*;
 import net.twelfthengine.renderer.Renderer2D;
 import net.twelfthengine.renderer.Renderer3D;
 import net.twelfthengine.renderer.TextRenderer;
 import net.twelfthengine.renderer.pipeline.RenderLayer;
 import net.twelfthengine.renderer.pipeline.RenderPipeline;
-import net.twelfthengine.renderer.postprocess.BasePostProcessEffect;
-import net.twelfthengine.renderer.postprocess.PostProcessEffect;
 import net.twelfthengine.renderer.postprocess.PostProcessPipeline;
-import net.twelfthengine.renderer.postprocess.effects.*;
+import net.twelfthengine.renderer.postprocess.effects.FogEffect;
+import net.twelfthengine.renderer.postprocess.effects.MotionBlurEffect;
 import net.twelfthengine.window.Window;
 import net.twelfthengine.world.World;
-import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL11;
 
 public class MyGame extends TwelfthApp {
 
-    private LightEntity mainLight;
-  private ModelEntity bombEntity;
+  // --- Entities ---
+  private PlayerCameraEntity camera;
+  private LightEntity        mainLight;
+  private ModelEntity        bombEntity;
+  private TextureEntity      treeSprite;
 
-    // --- Effects ---
   private PostProcessPipeline postProcess;
+  private MotionBlurEffect    motionBlur;
 
-  // --- QGUI System ---
-  private QGUIManager qgui;
-  private boolean isGuiVisible = false;
-  private boolean lastCState = false;
-  private Window windowInstance; // Store reference to window for locking/unlocking
-
+  // ------------------------------------------------------------------
+  // Entry point
+  // ------------------------------------------------------------------
   public static void main(String[] args) throws Exception {
     EngineBootstrap.run(new MyGame(), AppConfig.defaults());
   }
 
+  // ------------------------------------------------------------------
+  // onInit — spawn all entities, set active camera
+  // ------------------------------------------------------------------
+  @Override
   public void onInit(World world, AppConfig config) {
-      // --- Entities ---
-      PlayerCameraEntity camera = new PlayerCameraEntity(0f, 5f, 0f);
+
+    // Camera
+    camera = new PlayerCameraEntity(0f, 5f, 0f);
     camera.setPosition(new Vec3(0, 5, 0));
     camera.setRotation(0, 0, 0);
     world.addEntity(camera);
@@ -70,9 +71,9 @@ public class MyGame extends TwelfthApp {
 
     // Bomb model — loaded from encrypted .twa/.twm package
     try {
-      byte[] twaBytes = ResourceExtractor.readBytes("/models/6ovcmof8fc56.twa");
+      byte[]        twaBytes     = ResourceExtractor.readBytes("/models/6ovcmof8fc56.twa");
       TwelfthPackage assetArchive = new TwelfthPackage(twaBytes, "6ovcmof8fc56.twa");
-      byte[] twmBytes = assetArchive.getFileData("6ovcmof8fc56.twm");
+      byte[]        twmBytes     = assetArchive.getFileData("6ovcmof8fc56.twm");
       TwelfthPackage modelArchive = new TwelfthPackage(twmBytes, "6ovcmof8fc56.twm");
 
       bombEntity = new ModelEntity(-6, 600, 0, "6ovcmof8fc56.obj", modelArchive);
@@ -92,164 +93,82 @@ public class MyGame extends TwelfthApp {
     }
 
     // Tree billboard sprite
-      TextureEntity treeSprite = new TextureEntity(-10, 2, 0, "/models/tree/DB2X2_L01.png", 2.0f, 4.0f);
+    treeSprite = new TextureEntity(-10, 2, 0, "/models/tree/DB2X2_L01.png", 2.0f, 4.0f);
     world.addEntity(treeSprite);
-
-    // 4. Initialize QGUI
-    qgui = new QGUIManager();
-    QGUIMenuBar topBar = new QGUIMenuBar();
-    topBar.addMenu("Files").addItem("New", () -> {});
-    topBar.addMenu("Edit");
-    topBar.addMenu("Look");
-
-    topBar
-        .addMenu("Post Processing")
-        .addItem(
-            "Active Effects",
-            () -> {
-              QGUIWindow effectWindow = new QGUIWindow("Post Process Stack", 100, 100, 300, 400);
-
-              if (postProcess == null) return;
-
-              // We fetch the list of effects currently in the pipeline
-              // Assuming postProcess.getEffects() returns List<PostProcessEffect>
-              int yPos = 40;
-              for (PostProcessEffect effect : postProcess.getEffects()) {
-                // Stelle sicher, dass es eine BasePostProcessEffect ist
-                if (!(effect instanceof BasePostProcessEffect e)) continue;
-
-                String effectName = e.getClass().getSimpleName().replace("Effect", "");
-
-                QGUIButton toggleBtn = new QGUIButton(20, yPos, 260, 25, "", null);
-
-                toggleBtn.setCallback(
-                    () -> {
-                      boolean newState = !e.isEnabled();
-                      e.setEnabled(newState);
-                      toggleBtn.setText(
-                          effectName + ": " + (newState ? "[ ACTIVE ]" : "[ DISABLED ]"));
-                    });
-
-                toggleBtn.setText(
-                    effectName + ": " + (e.isEnabled() ? "[ ACTIVE ]" : "[ DISABLED ]"));
-                effectWindow.addElement(toggleBtn);
-                yPos += 35;
-              }
-
-              qgui.addWindow(effectWindow);
-            });
-
-    qgui.setMenuBar(topBar);
-
-    QGUIWindow demoWindow = new QGUIWindow("12th Engine Dashboard", 50, 50, 350, 250);
-    demoWindow.addElement(
-        new QGUIButton(
-            20,
-            30,
-            100,
-            20,
-            "Log Bomb Pos",
-            () -> {
-              if (bombEntity != null) System.out.println("Bomb Y: " + bombEntity.getPosition().y());
-            }));
-    qgui.addWindow(demoWindow);
-
-    InputManager.allowBypassKey(GLFW.GLFW_KEY_C);
   }
 
+  // ------------------------------------------------------------------
+  // onSetupRenderer — build and return the full render pipeline
+  // ------------------------------------------------------------------
   @Override
   public RenderPipeline onSetupRenderer(
-      World world,
-      AppConfig config,
-      Window window,
-      Renderer2D renderer2D,
-      Renderer3D renderer3D,
-      TextRenderer textRenderer)
-      throws Exception {
+          World world,
+          AppConfig config,
+          Window window,
+          Renderer2D renderer2D,
+          Renderer3D renderer3D,
+          TextRenderer textRenderer) throws Exception {
 
-    this.windowInstance = window; // Capture window reference
-    renderer3D.setFrustumCullingEnabled(true);
+    renderer3D.setFrustumCullingEnabled(false);
 
     RenderPipeline pipeline = new RenderPipeline();
 
+    // Post-processing pipeline
     postProcess = new PostProcessPipeline(config.width(), config.height());
     renderer3D.setActiveFbo(postProcess.getFboAId());
 
-    postProcess.addEffect(new ChromaticAberrationEffect().strength(0.008f).falloff(3f));
+    // Motion blur (optional)
+    motionBlur  = new MotionBlurEffect().strength(3f).samples(32).debug(0);
+    postProcess.addEffect(motionBlur);
 
-    pipeline.setPreFrameHook(
-        () -> {
-          boolean currentCState = InputManager.isKeyPressed(GLFW.GLFW_KEY_C);
-          if (currentCState && !lastCState) {
-            isGuiVisible = !isGuiVisible;
+    // Pre-frame: bind FBO and clear buffers
+    pipeline.setPreFrameHook(() -> {
+      postProcess.bind();
+      GL11.glClearColor(0f, 0f, 0f, 1f);
+      GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+      GL11.glEnable(GL11.GL_DEPTH_TEST);
+    });
 
-            InputManager.setInputBlocked(isGuiVisible);
+    // 3D opaque geometry
+    pipeline.addStep(RenderLayer.OPAQUE_3D, ctx -> {
+      ctx.renderer3D().render(ctx.world());
+      motionBlur.updateMatrices(ctx.renderer3D().getLastVP());
+    });
 
-            if (windowInstance != null) {
-              if (isGuiVisible) windowInstance.unlockMouse();
-              else windowInstance.lockMouse();
-            }
-          }
-          lastCState = currentCState;
+    // Debug 3D
+    pipeline.addStep(RenderLayer.DEBUG_3D, ctx -> {
+      ctx.renderer3D().setColor(1, 0, 0, 1);
+      ctx.renderer3D().drawWireCube(new Vec3(-1, -1, -1), 3f);
+      ctx.renderer3D().setColor(0, 0, 1, 1);
+      ctx.renderer3D().drawFilledBox(new Vec3(5, 5, 5), new Vec3(3, 3, 3));
+    });
 
-          if (isGuiVisible && windowInstance != null) {
-            qgui.update(
-                (int) InputManager.getMouseX(),
-                (int) InputManager.getMouseY(),
-                InputManager.isMouseDown(GLFW.GLFW_MOUSE_BUTTON_LEFT),
-                windowInstance.getWidth());
-          }
+    // 2D UI & final blit to screen
+    pipeline.addStep(RenderLayer.UI_2D, ctx -> {
+    });
 
-          postProcess.bind();
-          GL11.glClearColor(0f, 0f, 0f, 1f);
-          GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-          GL11.glEnable(GL11.GL_DEPTH_TEST);
-        });
-
-    pipeline.addStep(RenderLayer.OPAQUE_3D, ctx -> ctx.renderer3D().render(ctx.world()));
-
-    pipeline.addStep(
-        RenderLayer.DEBUG_3D,
-        ctx -> {
-          ctx.renderer3D().setColor(1, 0, 0, 1);
-          ctx.renderer3D().drawWireCube(new Vec3(-1, -1, -1), 3f);
-          ctx.renderer3D().setColor(0, 0, 1, 1);
-          ctx.renderer3D().drawFilledBox(new Vec3(5, 5, 5), new Vec3(3, 3, 3));
-        });
-
-    pipeline.addStep(RenderLayer.UI_2D, ctx -> {});
-
-    pipeline.addStep(RenderLayer.POST_BLIT, ctx -> postProcess.present());
-
-    pipeline.addStep(
-        RenderLayer.UI_2D_OVERLAY,
-        ctx -> {
-        });
-
-    pipeline.addStep(
-        RenderLayer.UI_2D_FOREGROUND,
-        ctx -> {
-          renderer2D.begin2D();
-          if (isGuiVisible) {
-            qgui.render(renderer2D, textRenderer);
-          }
-          renderer2D.end2D();
-        });
+    pipeline.addStep(RenderLayer.POST_BLIT, ctx -> {
+      postProcess.present();
+    });
 
     return pipeline;
   }
 
+  // ------------------------------------------------------------------
+  // onTick — fixed-rate game logic
+  // ------------------------------------------------------------------
   @Override
   public void onTick(double deltaTime) {
-    // Check for "C" Key Toggle (Gmod Style)
-
-    // Original Log
+    // normales Game-Update
     if (mainLight != null) {
       Vec3 toLight = mainLight.getDirectionToLightWorld();
       System.out.println("LightDir: " + toLight.x() + " " + toLight.y() + " " + toLight.z());
     }
   }
 
+  // ------------------------------------------------------------------
+  // onDispose — cleanup
+  // ------------------------------------------------------------------
   @Override
   public void onDispose() {
     if (postProcess != null) postProcess.dispose();

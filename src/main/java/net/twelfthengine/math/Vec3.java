@@ -2,6 +2,8 @@ package net.twelfthengine.math;
 
 public record Vec3(float x, float y, float z) {
 
+  public static final Vec3 ZERO = new Vec3(0f, 0f, 0f);
+
   public Vec3 add(Vec3 v) {
     return new Vec3(x + v.x, y + v.y, z + v.z);
   }
