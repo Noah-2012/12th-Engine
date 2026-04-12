@@ -91,14 +91,14 @@ public class Renderer3D {
   //      Use .identity() + in-place methods to avoid GC pressure.
   // =============================
 
-  private final Matrix4f currentView    = new Matrix4f();
-  private final Matrix4f currentProj    = new Matrix4f();
-  private final Matrix4f lastVP         = new Matrix4f();
+  private final Matrix4f currentView = new Matrix4f();
+  private final Matrix4f currentProj = new Matrix4f();
+  private final Matrix4f lastVP = new Matrix4f();
   // Scratch matrices for intermediate calculations — never returned to callers.
-  private final Matrix4f scratchMat     = new Matrix4f();
-  private final Matrix4f lightView      = new Matrix4f();
-  private final Matrix4f lightProj      = new Matrix4f();
-  private final Matrix4f lightSpace     = new Matrix4f();
+  private final Matrix4f scratchMat = new Matrix4f();
+  private final Matrix4f lightView = new Matrix4f();
+  private final Matrix4f lightProj = new Matrix4f();
+  private final Matrix4f lightSpace = new Matrix4f();
 
   public Matrix4f getLastVP() {
     return lastVP;
@@ -148,9 +148,9 @@ public class Renderer3D {
   // ASSET CACHES
   // =============================
 
-  private final Map<String, ObjModel> modelCache    = new HashMap<>();
-  private final Map<String, VboModel> vboCache      = new HashMap<>();
-  private final Map<String, Integer>  textureIdCache = new HashMap<>();
+  private final Map<String, ObjModel> modelCache = new HashMap<>();
+  private final Map<String, VboModel> vboCache = new HashMap<>();
+  private final Map<String, Integer> textureIdCache = new HashMap<>();
 
   // =============================
   // LEGACY SCENE HELPERS
@@ -159,7 +159,7 @@ public class Renderer3D {
   //      re-allocate them inside renderLegacyScene() every frame.
   // =============================
 
-  private final LegacyRenderer.ModelRenderer   legacyModelRenderer;
+  private final LegacyRenderer.ModelRenderer legacyModelRenderer;
   private final LegacyRenderer.TextureRenderer legacyTextureRenderer;
 
   // =============================
@@ -206,16 +206,16 @@ public class Renderer3D {
     legacy.initLegacyLighting();
 
     // FIX: Build these once; they only capture stable method references.
-    legacyModelRenderer   = new LegacyRenderer.ModelRenderer(this::loadVboModel, this::loadObjModel);
+    legacyModelRenderer = new LegacyRenderer.ModelRenderer(this::loadVboModel, this::loadObjModel);
     legacyTextureRenderer = new LegacyRenderer.TextureRenderer(this::loadTextureId);
 
     try {
-      depthShader  = new ShaderProgram("/shaders/shadow_depth.vert", "/shaders/shadow_depth.frag");
-      litShader    = new ShaderProgram("/shaders/lit_shadow.vert",   "/shaders/lit_shadow.frag");
-      shadowFbo    = new ShadowFramebuffer();
+      depthShader = new ShaderProgram("/shaders/shadow_depth.vert", "/shaders/shadow_depth.frag");
+      litShader = new ShaderProgram("/shaders/lit_shadow.vert", "/shaders/lit_shadow.frag");
+      shadowFbo = new ShadowFramebuffer();
       unitCubeMesh = new UnitCubeMesh();
-      planeMesh    = new PlaneMesh();
-      textureMesh  = new TextureMesh();
+      planeMesh = new PlaneMesh();
+      textureMesh = new TextureMesh();
       shadowsEnabled = true;
     } catch (Exception e) {
       System.err.println("[Renderer3D] Shader shadows disabled: " + e.getMessage());
@@ -229,41 +229,49 @@ public class Renderer3D {
   // =============================
 
   public ObjModel loadObjModel(String path) {
-    return modelCache.computeIfAbsent(path, k -> {
-      try {
-        return ObjLoader.load(k);
-      } catch (IOException e) {
-        System.err.println("Failed to load model: " + k);
-        return null;
-      }
-    });
+    return modelCache.computeIfAbsent(
+        path,
+        k -> {
+          try {
+            return ObjLoader.load(k);
+          } catch (IOException e) {
+            System.err.println("Failed to load model: " + k);
+            return null;
+          }
+        });
   }
 
   public VboModel loadVboModel(String path) {
-    return vboCache.computeIfAbsent(path, k -> {
-      ObjModel obj = loadObjModel(k);
-      return obj != null ? new VboModel(obj) : null;
-    });
+    return vboCache.computeIfAbsent(
+        path,
+        k -> {
+          ObjModel obj = loadObjModel(k);
+          return obj != null ? new VboModel(obj) : null;
+        });
   }
 
   public ObjModel loadObjModelFromPackage(TwelfthPackage pack, String internalPath) {
     String key = pack.getArchiveName() + ":" + internalPath;
-    return modelCache.computeIfAbsent(key, k -> {
-      try {
-        return ObjLoader.loadFromPackage(pack, internalPath);
-      } catch (IOException e) {
-        System.err.println("Failed to load model from package: " + internalPath);
-        return null;
-      }
-    });
+    return modelCache.computeIfAbsent(
+        key,
+        k -> {
+          try {
+            return ObjLoader.loadFromPackage(pack, internalPath);
+          } catch (IOException e) {
+            System.err.println("Failed to load model from package: " + internalPath);
+            return null;
+          }
+        });
   }
 
   public VboModel loadVboModelFromPackage(TwelfthPackage pack, String internalPath) {
     String key = pack.getArchiveName() + ":" + internalPath;
-    return vboCache.computeIfAbsent(key, k -> {
-      ObjModel obj = loadObjModelFromPackage(pack, internalPath);
-      return obj != null ? new VboModel(obj) : null;
-    });
+    return vboCache.computeIfAbsent(
+        key,
+        k -> {
+          ObjModel obj = loadObjModelFromPackage(pack, internalPath);
+          return obj != null ? new VboModel(obj) : null;
+        });
   }
 
   public int loadTextureId(String path) {
@@ -275,13 +283,13 @@ public class Renderer3D {
   // =============================
 
   public void render(World world) {
-    CameraEntity cam         = world.getActiveCamera();
-    LightEntity  shadowLight = world.getPrimaryShadowLight();
+    CameraEntity cam = world.getActiveCamera();
+    LightEntity shadowLight = world.getPrimaryShadowLight();
 
     // Compute light-space matrix into the cached field (no allocation).
     boolean doShadows = shadowsEnabled && shadowLight != null && shadowLight.isCastShadows();
     if (doShadows) {
-      computeLightSpaceMatrix(shadowLight);   // writes into this.lightSpace
+      computeLightSpaceMatrix(shadowLight); // writes into this.lightSpace
       renderShadowPass(world);
       GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, activeFboId);
       GL11.glViewport(0, 0, width, height);
@@ -305,15 +313,14 @@ public class Renderer3D {
     float aspect = (float) width / height;
 
     // In-place: identity() clears the matrix, then perspective() fills it.
-    currentProj.identity().perspective(
-            (float) Math.toRadians(fovDegrees), aspect, 0.1f, 1000f);
+    currentProj.identity().perspective((float) Math.toRadians(fovDegrees), aspect, 0.1f, 1000f);
 
     Vec3 pos = cam.getPosition();
-    currentView.identity()
-            .rotateX((float) Math.toRadians(cam.getPitch()))
-            .rotateY((float) Math.toRadians(cam.getYaw()))
-            .translate(-pos.x(), -pos.y(), -pos.z());
-
+    currentView
+        .identity()
+        .rotateX((float) Math.toRadians(cam.getPitch()))
+        .rotateY((float) Math.toRadians(cam.getYaw()))
+        .translate(-pos.x(), -pos.y(), -pos.z());
 
     // lastVP = proj * view (in-place, reuses lastVP storage)
     currentProj.mul(currentView, lastVP);
@@ -347,7 +354,7 @@ public class Renderer3D {
     lightView.identity().lookAt(p.x(), p.y(), p.z(), 0f, 0f, 0f, 0f, 1f, 0f);
     float s = light.getShadowOrthoHalfSize();
     lightProj.identity().ortho(-s, s, -s, s, light.getShadowNear(), light.getShadowFar());
-    lightProj.mul(lightView, lightSpace);   // lightSpace = lightProj * lightView
+    lightProj.mul(lightView, lightSpace); // lightSpace = lightProj * lightView
   }
 
   private final FrustumIntersection lightFrustum = new FrustumIntersection();
@@ -369,9 +376,9 @@ public class Renderer3D {
       if (e instanceof LightEntity || e instanceof CameraEntity) continue;
 
       float radius = boundingRadius(e);
-      if (frustumCullingEnabled && !lightFrustum.testSphere(
-              e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)
-      ) {
+      if (frustumCullingEnabled
+          && !lightFrustum.testSphere(
+              e.getPosition().x(), e.getPosition().y(), e.getPosition().z(), radius)) {
         continue;
       }
 
@@ -396,14 +403,14 @@ public class Renderer3D {
     litShader.use();
 
     Vec3 toLight = light.getDirectionToLightWorld().mul(-1f);
-    Vec3 lc      = light.getColor();
-    float inten  = light.getIntensity();
+    Vec3 lc = light.getColor();
+    float inten = light.getIntensity();
 
     litShader.setUniform3f("uLightDirWorld", toLight.x(), toLight.y(), toLight.z());
     litShader.setUniform3f("uLightColor", lc.x() * inten, lc.y() * inten, lc.z() * inten);
     litShader.setUniform3f("uAmbient", 0.1f, 0.11f, 0.14f);
     litShader.setUniform1i("uDiffuseTex", 0);
-    litShader.setUniform1i("uShadowMap",  1);
+    litShader.setUniform1i("uShadowMap", 1);
 
     GL13.glActiveTexture(GL13.GL_TEXTURE1);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, shadowFbo.getDepthTextureId());
@@ -458,20 +465,20 @@ public class Renderer3D {
 
   public Matrix4f modelMatrixForPlane(BasicPlaneEntity plane) {
     return new Matrix4f()
-            .translate(0f, plane.getTop(), 0f)
-            .scale(plane.getWidth(), 1f, plane.getLength());
+        .translate(0f, plane.getTop(), 0f)
+        .scale(plane.getWidth(), 1f, plane.getLength());
   }
 
   public Matrix4f modelMatrixForModel(ModelEntity me, VboModel vbo) {
-    Vec3 p   = me.getPosition();
+    Vec3 p = me.getPosition();
     Vec3 rot = me.getRotation();
-    float s  = me.getSize();
+    float s = me.getSize();
     return new Matrix4f()
-            .translate(p.x(), p.y(), p.z())
-            .rotateZ((float) Math.toRadians(rot.z()))
-            .rotateY((float) Math.toRadians(rot.y()))
-            .rotateX((float) Math.toRadians(rot.x()))
-            .scale(s);
+        .translate(p.x(), p.y(), p.z())
+        .rotateZ((float) Math.toRadians(rot.z()))
+        .rotateY((float) Math.toRadians(rot.y()))
+        .rotateX((float) Math.toRadians(rot.x()))
+        .scale(s);
   }
 
   // =============================
@@ -480,9 +487,9 @@ public class Renderer3D {
 
   /** Returns an approximate bounding sphere radius for frustum culling. */
   private float boundingRadius(BasicEntity e) {
-    if (e instanceof ModelEntity me)       return me.getModelBoundingRadius() * me.getSize();
+    if (e instanceof ModelEntity me) return me.getModelBoundingRadius() * me.getSize();
     if (e instanceof BasicPlaneEntity plane) return Math.max(plane.getWidth(), plane.getLength());
-    if (e instanceof TextureEntity te)     return Math.max(te.getWidth(), te.getHeight());
+    if (e instanceof TextureEntity te) return Math.max(te.getWidth(), te.getHeight());
     return e.getCollisionRadius() * 1.25f;
   }
 }

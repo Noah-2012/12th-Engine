@@ -29,7 +29,7 @@ public class ShaderProgram {
   private final FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
 
   public ShaderProgram(String vertexResource, String fragmentResource) throws IOException {
-    int vs = compile(GL20.GL_VERTEX_SHADER,   loadSource(vertexResource));
+    int vs = compile(GL20.GL_VERTEX_SHADER, loadSource(vertexResource));
     int fs = compile(GL20.GL_FRAGMENT_SHADER, loadSource(fragmentResource));
 
     programId = GL20.glCreateProgram();
@@ -72,14 +72,21 @@ public class ShaderProgram {
   // BIND / UNBIND
   // =============================
 
-  public void use()   { GL20.glUseProgram(programId); }
-  public void unbind(){ GL20.glUseProgram(0); }
+  public void use() {
+    GL20.glUseProgram(programId);
+  }
+
+  public void unbind() {
+    GL20.glUseProgram(0);
+  }
 
   // =============================
   // ACCESSORS
   // =============================
 
-  public int getProgramId() { return programId; }
+  public int getProgramId() {
+    return programId;
+  }
 
   // =============================
   // UNIFORM LOCATION (cached)
@@ -116,10 +123,9 @@ public class ShaderProgram {
   /**
    * Uploads a 4×4 matrix to a named uniform.
    *
-   * <p>FIX: Uses the instance-level cached {@link #matrixBuffer} instead of
-   * allocating a new {@code FloatBuffer} on every call. Safe because
-   * {@code glUniformMatrix4fv} copies the buffer contents synchronously —
-   * the driver does not hold a reference to the buffer after returning.
+   * <p>FIX: Uses the instance-level cached {@link #matrixBuffer} instead of allocating a new {@code
+   * FloatBuffer} on every call. Safe because {@code glUniformMatrix4fv} copies the buffer contents
+   * synchronously — the driver does not hold a reference to the buffer after returning.
    */
   public void setUniformMatrix4fv(String name, boolean transpose, Matrix4f matrix) {
     matrixBuffer.clear();
@@ -128,8 +134,8 @@ public class ShaderProgram {
   }
 
   /**
-   * Raw overload for callers that already have a {@link FloatBuffer} (e.g. from
-   * a cached field in an effect class). Prefer {@link #setUniformMatrix4fv(String, boolean, Matrix4f)}.
+   * Raw overload for callers that already have a {@link FloatBuffer} (e.g. from a cached field in
+   * an effect class). Prefer {@link #setUniformMatrix4fv(String, boolean, Matrix4f)}.
    */
   public void setUniformMatrix4fv(String name, boolean transpose, FloatBuffer buffer) {
     GL20.glUniformMatrix4fv(getUniformLocation(name), transpose, buffer);
@@ -148,9 +154,9 @@ public class ShaderProgram {
   // =============================
 
   /**
-   * @deprecated Allocates a new off-heap {@link FloatBuffer} on every call.
-   *             Use {@link #setUniformMatrix4fv(String, boolean, Matrix4f)} instead,
-   *             which reuses a cached buffer internally.
+   * @deprecated Allocates a new off-heap {@link FloatBuffer} on every call. Use {@link
+   *     #setUniformMatrix4fv(String, boolean, Matrix4f)} instead, which reuses a cached buffer
+   *     internally.
    */
   @Deprecated
   public static FloatBuffer matrixToBuffer(Matrix4f m) {

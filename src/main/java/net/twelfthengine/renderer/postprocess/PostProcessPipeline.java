@@ -51,7 +51,7 @@ public class PostProcessPipeline {
     // Vertex shader — generates a fullscreen triangle from gl_VertexID.
     // No VBO needed; a dummy VAO satisfies the core profile requirement.
     String vert =
-            """
+        """
             #version 330 core
             out vec2 uv;
             void main() {
@@ -65,7 +65,7 @@ public class PostProcessPipeline {
             """;
 
     String frag =
-            """
+        """
             #version 330 core
             in  vec2 uv;
             out vec4 fragColor;
@@ -115,16 +115,15 @@ public class PostProcessPipeline {
   }
 
   /**
-   * Call after scene rendering to apply all effects in sequence and blit the
-   * final result to the default framebuffer.
+   * Call after scene rendering to apply all effects in sequence and blit the final result to the
+   * default framebuffer.
    *
-   * <p>Ping-pong strategy: fboA holds the scene after {@link #bind()} / scene
-   * render. Each effect reads from {@code readFbo} and writes to
-   * {@code writeFbo}; the two are then swapped. After the loop the last
-   * written result sits in {@code readFbo} and is blit to the screen.
+   * <p>Ping-pong strategy: fboA holds the scene after {@link #bind()} / scene render. Each effect
+   * reads from {@code readFbo} and writes to {@code writeFbo}; the two are then swapped. After the
+   * loop the last written result sits in {@code readFbo} and is blit to the screen.
    */
   public void present() {
-    PostProcessFbo readFbo  = fboA;
+    PostProcessFbo readFbo = fboA;
     PostProcessFbo writeFbo = fboB;
 
     for (PostProcessEffect effect : effects) {
@@ -143,7 +142,7 @@ public class PostProcessPipeline {
 
       // Swap ping-pong buffers.
       PostProcessFbo temp = readFbo;
-      readFbo  = writeFbo;
+      readFbo = writeFbo;
       writeFbo = temp;
     }
 

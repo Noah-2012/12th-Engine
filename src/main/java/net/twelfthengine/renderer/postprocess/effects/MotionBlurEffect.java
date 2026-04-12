@@ -11,7 +11,7 @@ import org.lwjgl.opengl.GL20;
 
 public class MotionBlurEffect extends BasePostProcessEffect {
 
-  private final ShaderProgram  shader;
+  private final ShaderProgram shader;
   private final FullscreenQuad quad;
 
   // ---------------------------------------------------------------
@@ -20,9 +20,9 @@ public class MotionBlurEffect extends BasePostProcessEffect {
   //      Previously, new Matrix4f(...) was called 3-4 times per frame inside
   //      applyEffect() and blitPassthrough() — pure GC pressure.
   // ---------------------------------------------------------------
-  private final Matrix4f prevVP   = new Matrix4f();
-  private final Matrix4f currVP   = new Matrix4f();
-  private final Matrix4f invVP    = new Matrix4f();
+  private final Matrix4f prevVP = new Matrix4f();
+  private final Matrix4f currVP = new Matrix4f();
+  private final Matrix4f invVP = new Matrix4f();
   private final Matrix4f identity = new Matrix4f(); // permanent identity, never mutated
 
   // FIX: Merged firstFrame + historyValid into a single warmupFrames counter.
@@ -32,8 +32,8 @@ public class MotionBlurEffect extends BasePostProcessEffect {
   private boolean hasCurrVP = false;
 
   private float blurStrength = 0.5f;
-  private int   samples      = 8;
-  private int   debugMode    = 0;
+  private int samples = 8;
+  private int debugMode = 0;
 
   // FIX: Cached uniform locations — no glGetUniformLocation per frame.
   private final int uInvVP;
@@ -54,20 +54,21 @@ public class MotionBlurEffect extends BasePostProcessEffect {
   private final float[] matArr = new float[16];
 
   public MotionBlurEffect() throws Exception {
-    shader = new ShaderProgram(
-        "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/motionblur.frag");
+    shader =
+        new ShaderProgram(
+            "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/motionblur.frag");
     quad = new FullscreenQuad();
 
     int prog = shader.getProgramId();
-    uInvVP       = GL20.glGetUniformLocation(prog, "uInvVP");
-    uPrevVP      = GL20.glGetUniformLocation(prog, "uPrevVP");
-    uColorTex    = GL20.glGetUniformLocation(prog, "uColorTex");
-    uDepthTex    = GL20.glGetUniformLocation(prog, "uDepthTex");
+    uInvVP = GL20.glGetUniformLocation(prog, "uInvVP");
+    uPrevVP = GL20.glGetUniformLocation(prog, "uPrevVP");
+    uColorTex = GL20.glGetUniformLocation(prog, "uColorTex");
+    uDepthTex = GL20.glGetUniformLocation(prog, "uDepthTex");
     uBlurStrength = GL20.glGetUniformLocation(prog, "uBlurStrength");
-    uSamples     = GL20.glGetUniformLocation(prog, "uSamples");
-    uNear        = GL20.glGetUniformLocation(prog, "uNear");
-    uFar         = GL20.glGetUniformLocation(prog, "uFar");
-    uDebugMode   = GL20.glGetUniformLocation(prog, "uDebugMode");
+    uSamples = GL20.glGetUniformLocation(prog, "uSamples");
+    uNear = GL20.glGetUniformLocation(prog, "uNear");
+    uFar = GL20.glGetUniformLocation(prog, "uFar");
+    uDebugMode = GL20.glGetUniformLocation(prog, "uDebugMode");
 
     // FIX: Sampler slots are constants — set once.
     shader.use();
@@ -76,13 +77,24 @@ public class MotionBlurEffect extends BasePostProcessEffect {
     shader.unbind();
   }
 
-  public MotionBlurEffect strength(float s) { this.blurStrength = s; return this; }
-  public MotionBlurEffect samples(int s)    { this.samples      = s; return this; }
-  public MotionBlurEffect debug(int mode)   { this.debugMode    = mode; return this; }
+  public MotionBlurEffect strength(float s) {
+    this.blurStrength = s;
+    return this;
+  }
+
+  public MotionBlurEffect samples(int s) {
+    this.samples = s;
+    return this;
+  }
+
+  public MotionBlurEffect debug(int mode) {
+    this.debugMode = mode;
+    return this;
+  }
 
   /**
-   * Call every frame from the renderer after the world render, before present().
-   * FIX: Uses Matrix4f.set() instead of new Matrix4f(src) — no allocation.
+   * Call every frame from the renderer after the world render, before present(). FIX: Uses
+   * Matrix4f.set() instead of new Matrix4f(src) — no allocation.
    */
   public void updateMatrices(Matrix4f currentVP) {
     currVP.set(currentVP);
@@ -91,7 +103,7 @@ public class MotionBlurEffect extends BasePostProcessEffect {
 
   public void resetHistory() {
     warmupFrames = 2;
-    hasCurrVP    = false;
+    hasCurrVP = false;
   }
 
   @Override
@@ -116,7 +128,7 @@ public class MotionBlurEffect extends BasePostProcessEffect {
     shader.use();
 
     // FIX: Upload matrices via the cached matBuf — no BufferUtils.createFloatBuffer.
-    uploadMatrix(uInvVP,  invVP);
+    uploadMatrix(uInvVP, invVP);
     uploadMatrix(uPrevVP, prevVP);
 
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
@@ -125,10 +137,10 @@ public class MotionBlurEffect extends BasePostProcessEffect {
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, depthTex);
 
     GL20.glUniform1f(uBlurStrength, blurStrength);
-    GL20.glUniform1i(uSamples,      samples);
-    GL20.glUniform1f(uNear,         0.1f);
-    GL20.glUniform1f(uFar,          1000f);
-    GL20.glUniform1i(uDebugMode,    debugMode);
+    GL20.glUniform1i(uSamples, samples);
+    GL20.glUniform1f(uNear, 0.1f);
+    GL20.glUniform1f(uFar, 1000f);
+    GL20.glUniform1i(uDebugMode, debugMode);
 
     quad.draw();
     shader.unbind();
@@ -140,13 +152,13 @@ public class MotionBlurEffect extends BasePostProcessEffect {
   }
 
   /**
-   * Copies colorTex unchanged. Used during warmup frames so output is never black.
-   * FIX: Uses the permanent identity field — no new Matrix4f() allocation.
+   * Copies colorTex unchanged. Used during warmup frames so output is never black. FIX: Uses the
+   * permanent identity field — no new Matrix4f() allocation.
    */
   private void blitPassthrough(int colorTex, int depthTex) {
     shader.use();
 
-    uploadMatrix(uInvVP,  identity);
+    uploadMatrix(uInvVP, identity);
     uploadMatrix(uPrevVP, identity);
 
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
@@ -155,9 +167,9 @@ public class MotionBlurEffect extends BasePostProcessEffect {
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, depthTex);
 
     GL20.glUniform1f(uBlurStrength, 0f);
-    GL20.glUniform1i(uSamples,      1);
-    GL20.glUniform1f(uNear,         0.1f);
-    GL20.glUniform1f(uFar,          1000f);
+    GL20.glUniform1i(uSamples, 1);
+    GL20.glUniform1f(uNear, 0.1f);
+    GL20.glUniform1f(uFar, 1000f);
 
     quad.draw();
     shader.unbind();
@@ -173,8 +185,8 @@ public class MotionBlurEffect extends BasePostProcessEffect {
   }
 
   /**
-   * Returns false if the matrix is degenerate (near-zero determinant) or contains NaN/Inf.
-   * FIX: Uses the cached matArr scratch array — no new float[16] per call.
+   * Returns false if the matrix is degenerate (near-zero determinant) or contains NaN/Inf. FIX:
+   * Uses the cached matArr scratch array — no new float[16] per call.
    */
   private boolean isMatrixValid(Matrix4f m) {
     float det = m.determinant();

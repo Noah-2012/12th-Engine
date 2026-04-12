@@ -14,7 +14,7 @@ public class BloomEffect extends BasePostProcessEffect {
 
   private float threshold = 0.8f;
   private float intensity = 1.2f;
-  private int   blurRadius = 4;
+  private int blurRadius = 4;
 
   // FIX: Cache all uniform locations once after shader link.
   //      glGetUniformLocation is a driver string-lookup — never call it per frame.
@@ -24,12 +24,13 @@ public class BloomEffect extends BasePostProcessEffect {
   private final int uBlurRadius;
 
   public BloomEffect() throws Exception {
-    shader = new ShaderProgram(
-        "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/bloom.frag");
+    shader =
+        new ShaderProgram(
+            "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/bloom.frag");
     quad = new FullscreenQuad();
 
     int prog = shader.getProgramId();
-    uColorTex  = GL20.glGetUniformLocation(prog, "uColorTex");
+    uColorTex = GL20.glGetUniformLocation(prog, "uColorTex");
     uThreshold = GL20.glGetUniformLocation(prog, "uThreshold");
     uIntensity = GL20.glGetUniformLocation(prog, "uIntensity");
     uBlurRadius = GL20.glGetUniformLocation(prog, "uBlurRadius");
@@ -41,9 +42,20 @@ public class BloomEffect extends BasePostProcessEffect {
     shader.unbind();
   }
 
-  public BloomEffect threshold(float t) { this.threshold  = t; return this; }
-  public BloomEffect intensity(float i) { this.intensity  = i; return this; }
-  public BloomEffect blurRadius(int r)  { this.blurRadius = r; return this; }
+  public BloomEffect threshold(float t) {
+    this.threshold = t;
+    return this;
+  }
+
+  public BloomEffect intensity(float i) {
+    this.intensity = i;
+    return this;
+  }
+
+  public BloomEffect blurRadius(int r) {
+    this.blurRadius = r;
+    return this;
+  }
 
   @Override
   public void applyEffect(int colorTex, int depthTex) {

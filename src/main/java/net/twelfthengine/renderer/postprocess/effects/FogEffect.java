@@ -13,8 +13,8 @@ public class FogEffect extends BasePostProcessEffect {
   private final FullscreenQuad quad;
 
   private float density = 0.04f;
-  private float near    = 0.1f;
-  private float far     = 1000f;
+  private float near = 0.1f;
+  private float far = 1000f;
 
   // FIX: Flat floats instead of float[] — no allocation on color() setter call.
   private float fogR = 0.6f, fogG = 0.65f, fogB = 0.7f;
@@ -28,17 +28,17 @@ public class FogEffect extends BasePostProcessEffect {
   private final int uFogColor;
 
   public FogEffect() throws Exception {
-    shader = new ShaderProgram(
-        "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/fog.frag");
+    shader =
+        new ShaderProgram("/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/fog.frag");
     quad = new FullscreenQuad();
 
     int prog = shader.getProgramId();
-    uColorTex  = GL20.glGetUniformLocation(prog, "uColorTex");
-    uDepthTex  = GL20.glGetUniformLocation(prog, "uDepthTex");
-    uNear      = GL20.glGetUniformLocation(prog, "uNear");
-    uFar       = GL20.glGetUniformLocation(prog, "uFar");
+    uColorTex = GL20.glGetUniformLocation(prog, "uColorTex");
+    uDepthTex = GL20.glGetUniformLocation(prog, "uDepthTex");
+    uNear = GL20.glGetUniformLocation(prog, "uNear");
+    uFar = GL20.glGetUniformLocation(prog, "uFar");
     uFogDensity = GL20.glGetUniformLocation(prog, "uFogDensity");
-    uFogColor  = GL20.glGetUniformLocation(prog, "uFogColor");
+    uFogColor = GL20.glGetUniformLocation(prog, "uFogColor");
 
     // FIX: Sampler slots are constants — set once.
     shader.use();
@@ -47,10 +47,27 @@ public class FogEffect extends BasePostProcessEffect {
     shader.unbind();
   }
 
-  public FogEffect density(float d)                { this.density = d; return this; }
-  public FogEffect near(float n)                   { this.near    = n; return this; }
-  public FogEffect far(float f)                    { this.far     = f; return this; }
-  public FogEffect color(float r, float g, float b){ fogR=r; fogG=g; fogB=b; return this; }
+  public FogEffect density(float d) {
+    this.density = d;
+    return this;
+  }
+
+  public FogEffect near(float n) {
+    this.near = n;
+    return this;
+  }
+
+  public FogEffect far(float f) {
+    this.far = f;
+    return this;
+  }
+
+  public FogEffect color(float r, float g, float b) {
+    fogR = r;
+    fogG = g;
+    fogB = b;
+    return this;
+  }
 
   @Override
   public void applyEffect(int colorTex, int depthTex) {
@@ -67,10 +84,10 @@ public class FogEffect extends BasePostProcessEffect {
     GL13.glActiveTexture(GL13.GL_TEXTURE1);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, depthTex);
 
-    GL20.glUniform1f(uNear,       near);
-    GL20.glUniform1f(uFar,        far);
+    GL20.glUniform1f(uNear, near);
+    GL20.glUniform1f(uFar, far);
     GL20.glUniform1f(uFogDensity, density);
-    GL20.glUniform3f(uFogColor,   fogR, fogG, fogB);
+    GL20.glUniform3f(uFogColor, fogR, fogG, fogB);
 
     quad.draw();
     shader.unbind();

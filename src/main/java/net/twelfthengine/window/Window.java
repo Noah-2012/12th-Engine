@@ -17,7 +17,7 @@ public class Window {
   private int width, height;
   private final String title;
   private final int id;
-  private boolean mouseLocked  = false;
+  private boolean mouseLocked = false;
   private boolean isFullscreen = false;
   private int windowedX, windowedY, windowedWidth, windowedHeight;
 
@@ -26,14 +26,14 @@ public class Window {
   private final int[] fbScratch = new int[2];
 
   private final java.util.List<java.util.function.BiConsumer<Integer, Integer>> resizeListeners =
-          new java.util.ArrayList<>();
+      new java.util.ArrayList<>();
 
   public Window(int id, int width, int height, String title) {
-    this.id             = id;
-    this.width          = width;
-    this.height         = height;
-    this.title          = title;
-    this.windowedWidth  = width;
+    this.id = id;
+    this.width = width;
+    this.height = height;
+    this.title = title;
+    this.windowedWidth = width;
     this.windowedHeight = height;
   }
 
@@ -42,9 +42,9 @@ public class Window {
   }
 
   /**
-   * @param shareContext  GLFW context to share resources with (0 = none).
-   * @param enableVSync   Pass {@code true} to cap the frame-rate to the monitor
-   *                      refresh rate, {@code false} for uncapped rendering.
+   * @param shareContext GLFW context to share resources with (0 = none).
+   * @param enableVSync Pass {@code true} to cap the frame-rate to the monitor refresh rate, {@code
+   *     false} for uncapped rendering.
    */
   public void init(long shareContext, boolean enableVSync) {
     GLFWErrorCallback.createPrint(System.err).set();
@@ -52,9 +52,9 @@ public class Window {
     if (!GLFW.glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
 
     GLFW.glfwDefaultWindowHints();
-    GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE,   GLFW.GLFW_FALSE);
+    GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
     GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
-    GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES,   4);
+    GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, 4);
 
     windowHandle = GLFW.glfwCreateWindow(width, height, title, 0, shareContext);
     if (windowHandle == 0) throw new RuntimeException("Failed to create GLFW window");
@@ -83,13 +83,13 @@ public class Window {
     GLFW.glfwShowWindow(windowHandle);
 
     GLFW.glfwSetFramebufferSizeCallback(
-            windowHandle,
-            (win, w, h) -> {
-              this.width  = w;
-              this.height = h;
-              GL11.glViewport(0, 0, w, h);
-              for (var listener : resizeListeners) listener.accept(w, h);
-            });
+        windowHandle,
+        (win, w, h) -> {
+          this.width = w;
+          this.height = h;
+          GL11.glViewport(0, 0, w, h);
+          for (var listener : resizeListeners) listener.accept(w, h);
+        });
 
     // Sync to actual framebuffer size immediately (handles HiDPI at startup).
     GLFW.glfwGetFramebufferSize(windowHandle, fbScratch, null);
@@ -97,13 +97,19 @@ public class Window {
     // use the two-array variant below.
     int[] fw = new int[1], fh = new int[1];
     GLFW.glfwGetFramebufferSize(windowHandle, fw, fh);
-    this.width  = fw[0];
+    this.width = fw[0];
     this.height = fh[0];
     GL11.glViewport(0, 0, this.width, this.height);
 
     System.out.println(
-            "[Window] OpenGL Window created: ID=" + id + " Size=" + width + "x" + height
-                    + " VSync=" + enableVSync);
+        "[Window] OpenGL Window created: ID="
+            + id
+            + " Size="
+            + width
+            + "x"
+            + height
+            + " VSync="
+            + enableVSync);
   }
 
   // Convenience overload — keeps old call-sites compiling without changes.
@@ -186,13 +192,13 @@ public class Window {
   public void toggleFullscreen() {
     if (isFullscreen) {
       GLFW.glfwSetWindowMonitor(
-              windowHandle,
-              0,
-              windowedX,
-              windowedY,
-              windowedWidth,
-              windowedHeight,
-              GLFW.GLFW_DONT_CARE);
+          windowHandle,
+          0,
+          windowedX,
+          windowedY,
+          windowedWidth,
+          windowedHeight,
+          GLFW.GLFW_DONT_CARE);
       isFullscreen = false;
       System.out.println("[Window] Exited fullscreen mode");
     } else {
@@ -201,22 +207,22 @@ public class Window {
       int[] wPos = new int[1], hPos = new int[1];
       GLFW.glfwGetWindowSize(windowHandle, wPos, hPos);
 
-      windowedX      = xPos[0];
-      windowedY      = yPos[0];
-      windowedWidth  = wPos[0];
+      windowedX = xPos[0];
+      windowedY = yPos[0];
+      windowedWidth = wPos[0];
       windowedHeight = hPos[0];
 
       long primaryMonitor = GLFW.glfwGetPrimaryMonitor();
-      var  videoMode      = GLFW.glfwGetVideoMode(primaryMonitor);
+      var videoMode = GLFW.glfwGetVideoMode(primaryMonitor);
 
       GLFW.glfwSetWindowMonitor(
-              windowHandle,
-              primaryMonitor,
-              0,
-              0,
-              videoMode.width(),
-              videoMode.height(),
-              videoMode.refreshRate());
+          windowHandle,
+          primaryMonitor,
+          0,
+          0,
+          videoMode.width(),
+          videoMode.height(),
+          videoMode.refreshRate());
       isFullscreen = true;
       System.out.println("[Window] Entered fullscreen mode");
     }
@@ -226,8 +232,8 @@ public class Window {
     try (MemoryStack stack = MemoryStack.stackPush()) {
       String iconPath = ResourceExtractor.extract(resourcePath);
 
-      IntBuffer w        = stack.mallocInt(1);
-      IntBuffer h        = stack.mallocInt(1);
+      IntBuffer w = stack.mallocInt(1);
+      IntBuffer h = stack.mallocInt(1);
       IntBuffer channels = stack.mallocInt(1);
 
       ByteBuffer image = STBImage.stbi_load(iconPath, w, h, channels, 4);
@@ -235,7 +241,7 @@ public class Window {
         throw new RuntimeException("Failed to load window icon: " + STBImage.stbi_failure_reason());
       }
 
-      GLFWImage        icon  = GLFWImage.malloc(stack);
+      GLFWImage icon = GLFWImage.malloc(stack);
       icon.set(w.get(0), h.get(0), image);
 
       GLFWImage.Buffer icons = GLFWImage.malloc(1, stack);

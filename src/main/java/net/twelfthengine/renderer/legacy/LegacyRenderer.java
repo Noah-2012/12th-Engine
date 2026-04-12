@@ -75,9 +75,9 @@ public class LegacyRenderer {
 
     Vec3 pos = cam.getPosition();
     view.identity()
-            .rotateX((float) Math.toRadians(cam.getPitch()))
-            .rotateY((float) Math.toRadians(cam.getYaw()))
-            .translate(-pos.x(), -pos.y(), -pos.z());
+        .rotateX((float) Math.toRadians(cam.getPitch()))
+        .rotateY((float) Math.toRadians(cam.getYaw()))
+        .translate(-pos.x(), -pos.y(), -pos.z());
 
     projBuffer.clear();
     proj.get(projBuffer);
@@ -99,7 +99,7 @@ public class LegacyRenderer {
    * Renderer3D#renderLegacyScene.
    */
   public void renderScene(
-          World world, ModelRenderer modelRenderer, TextureRenderer textureRenderer) {
+      World world, ModelRenderer modelRenderer, TextureRenderer textureRenderer) {
     for (BasicEntity e : world.getEntities()) {
       if (e instanceof LightEntity || e instanceof CameraEntity) continue;
 
@@ -295,8 +295,8 @@ public class LegacyRenderer {
     private final java.util.function.Function<String, ObjModel> objSupplier;
 
     public ModelRenderer(
-            java.util.function.Function<String, VboModel> vboSupplier,
-            java.util.function.Function<String, ObjModel> objSupplier) {
+        java.util.function.Function<String, VboModel> vboSupplier,
+        java.util.function.Function<String, ObjModel> objSupplier) {
       this.vboSupplier = vboSupplier;
       this.objSupplier = objSupplier;
     }

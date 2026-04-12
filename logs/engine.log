@@ -21110,3 +21110,210 @@
 [2026-04-12 13:33:10] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
 [2026-04-12 13:33:11] [INFO] [12th Engine][12th Engine]: Engine stopped
 [2026-04-12 13:33:11] [INFO] [12th Engine][Window]: Window closed, engine stopped.
+[2026-04-12 13:52:40] [INFO] [12th Engine][12th Engine]: Engine started
+[2026-04-12 13:52:41] [INFO] [12th Engine][Startup]: Starting EngineObject
+[2026-04-12 13:52:41] [INFO] [12th Engine][Startup]: Starting TickManager
+[2026-04-12 13:52:42] [INFO] [12th Engine][Startup]: Initialized InputManager and Window
+[2026-04-12 13:52:42] [INFO] [12th Engine][Startup]: Created World
+[2026-04-12 13:52:42] [INFO] [12th Engine][Startup]: Game onInit complete
+[2026-04-12 13:52:42] [INFO] [12th Engine][Startup]: Game render pipeline ready
+[2026-04-12 13:52:43] [INFO] [12th Engine][Startup]: Starting 12th Engine v1.1.3
+[2026-04-12 13:52:48] [INFO] [12th Engine][TickProfiler]: TPS: 0, Skipped: 0
+[2026-04-12 13:52:48] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 5.2144226s
+[2026-04-12 13:52:49] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 1
+[2026-04-12 13:52:50] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:52:51] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:52:52] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:52:53] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:52:54] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:52:55] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:52:56] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:52:57] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:52:58] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:52:59] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:00] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:01] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:02] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:03] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:04] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:05] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:06] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:07] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:08] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:09] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:10] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:11] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:12] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:13] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:14] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:15] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:16] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:17] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:18] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:19] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:20] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:21] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:22] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:23] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:24] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:25] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:26] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:27] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:28] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:29] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:30] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:31] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:32] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:33] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:34] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:35] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:36] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:37] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:38] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:39] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:40] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:41] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:42] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:43] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:44] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:45] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:46] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:47] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:48] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:49] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:50] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:51] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:52] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:53] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:54] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:55] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:56] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:57] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:58] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:53:59] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:00] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:01] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:02] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:03] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:04] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:05] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:06] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:07] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:08] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:09] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:10] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:11] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:12] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:13] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:14] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:15] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:16] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:17] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:18] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:19] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:20] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:21] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:22] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:23] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:24] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:25] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:26] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:27] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:28] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:29] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:30] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:31] [INFO] [12th Engine][TickProfiler]: TPS: 20, Skipped: 0
+[2026-04-12 13:54:31] [INFO] [12th Engine][Profiler]: Lag simulation enabled (200 ms/tick)
+[2026-04-12 13:54:32] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2615212s
+[2026-04-12 13:54:32] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2139079s
+[2026-04-12 13:54:32] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2142975s
+[2026-04-12 13:54:32] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2139991s
+[2026-04-12 13:54:32] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.214399s
+[2026-04-12 13:54:32] [INFO] [12th Engine][TickProfiler]: TPS: 16, Skipped: 5
+[2026-04-12 13:54:33] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2143654s
+[2026-04-12 13:54:33] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2144461s
+[2026-04-12 13:54:33] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2141189s
+[2026-04-12 13:54:33] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2141994s
+[2026-04-12 13:54:33] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2145464s
+[2026-04-12 13:54:34] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2132432s
+[2026-04-12 13:54:34] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2144542s
+[2026-04-12 13:54:34] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2145039s
+[2026-04-12 13:54:34] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2145997s
+[2026-04-12 13:54:35] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2149218s
+[2026-04-12 13:54:35] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.214161s
+[2026-04-12 13:54:35] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2141488s
+[2026-04-12 13:54:35] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.214535s
+[2026-04-12 13:54:35] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2145645s
+[2026-04-12 13:54:36] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2142833s
+[2026-04-12 13:54:36] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.214121s
+[2026-04-12 13:54:36] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2141021s
+[2026-04-12 13:54:36] [INFO] [12th Engine][TickProfiler]: TPS: 17, Skipped: 17
+[2026-04-12 13:54:36] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2147221s
+[2026-04-12 13:54:36] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2146489s
+[2026-04-12 13:54:37] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2146259s
+[2026-04-12 13:54:37] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2141223s
+[2026-04-12 13:54:37] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2149386s
+[2026-04-12 13:54:37] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2137779s
+[2026-04-12 13:54:38] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2151138s
+[2026-04-12 13:54:38] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2145605s
+[2026-04-12 13:54:38] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2146441s
+[2026-04-12 13:54:38] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2144726s
+[2026-04-12 13:54:38] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2136675s
+[2026-04-12 13:54:39] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2145976s
+[2026-04-12 13:54:39] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2146327s
+[2026-04-12 13:54:39] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2138632s
+[2026-04-12 13:54:39] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2130573s
+[2026-04-12 13:54:39] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2144506s
+[2026-04-12 13:54:40] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2136574s
+[2026-04-12 13:54:40] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2148575s
+[2026-04-12 13:54:40] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2136366s
+[2026-04-12 13:54:40] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2147583s
+[2026-04-12 13:54:41] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.215236s
+[2026-04-12 13:54:41] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2148983s
+[2026-04-12 13:54:41] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2146461s
+[2026-04-12 13:54:41] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.214362s
+[2026-04-12 13:54:41] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2134633s
+[2026-04-12 13:54:42] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2133143s
+[2026-04-12 13:54:42] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2143516s
+[2026-04-12 13:54:42] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2142196s
+[2026-04-12 13:54:42] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2153056s
+[2026-04-12 13:54:42] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.213703s
+[2026-04-12 13:54:43] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2149223s
+[2026-04-12 13:54:43] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2143927s
+[2026-04-12 13:54:43] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2146158s
+[2026-04-12 13:54:43] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.214s
+[2026-04-12 13:54:44] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2144812s
+[2026-04-12 13:54:44] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2145109s
+[2026-04-12 13:54:44] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2140518s
+[2026-04-12 13:54:44] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2144439s
+[2026-04-12 13:54:44] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2146903s
+[2026-04-12 13:54:45] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2142738s
+[2026-04-12 13:54:45] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2131884s
+[2026-04-12 13:54:45] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2139306s
+[2026-04-12 13:54:45] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2141833s
+[2026-04-12 13:54:45] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2004767s
+[2026-04-12 13:54:46] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2139479s
+[2026-04-12 13:54:46] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.214254s
+[2026-04-12 13:54:46] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2150943s
+[2026-04-12 13:54:46] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2139124s
+[2026-04-12 13:54:46] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2147509s
+[2026-04-12 13:54:47] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2148474s
+[2026-04-12 13:54:47] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2153047s
+[2026-04-12 13:54:47] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2141719s
+[2026-04-12 13:54:47] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2009608s
+[2026-04-12 13:54:48] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2154114s
+[2026-04-12 13:54:48] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2144342s
+[2026-04-12 13:54:48] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.214499s
+[2026-04-12 13:54:48] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2153923s
+[2026-04-12 13:54:48] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2150823s
+[2026-04-12 13:54:49] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2157613s
+[2026-04-12 13:54:49] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2155973s
+[2026-04-12 13:54:49] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2136542s
+[2026-04-12 13:54:49] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2146878s
+[2026-04-12 13:54:49] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.215274s
+[2026-04-12 13:54:50] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2145733s
+[2026-04-12 13:54:50] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2147559s
+[2026-04-12 13:54:50] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2144604s
+[2026-04-12 13:54:50] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2145395s
+[2026-04-12 13:54:51] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2131843s
+[2026-04-12 13:54:51] [WARN] [12th Engine][TickProfiler]: Lag detected! Tick skipped. Elapsed: 0.2154998s

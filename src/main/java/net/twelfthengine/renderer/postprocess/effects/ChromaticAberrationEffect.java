@@ -13,7 +13,7 @@ public class ChromaticAberrationEffect extends BasePostProcessEffect {
   private final FullscreenQuad quad;
 
   private float strength = 0.005f;
-  private float falloff  = 1.0f;
+  private float falloff = 1.0f;
 
   // FIX: Cached uniform locations — never call glGetUniformLocation per frame.
   private final int uColorTex;
@@ -21,14 +21,15 @@ public class ChromaticAberrationEffect extends BasePostProcessEffect {
   private final int uFalloff;
 
   public ChromaticAberrationEffect() throws Exception {
-    shader = new ShaderProgram(
-        "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/chromatic.frag");
+    shader =
+        new ShaderProgram(
+            "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/chromatic.frag");
     quad = new FullscreenQuad();
 
     int prog = shader.getProgramId();
     uColorTex = GL20.glGetUniformLocation(prog, "uColorTex");
     uStrength = GL20.glGetUniformLocation(prog, "uStrength");
-    uFalloff  = GL20.glGetUniformLocation(prog, "uFalloff");
+    uFalloff = GL20.glGetUniformLocation(prog, "uFalloff");
 
     // FIX: Sampler slot is constant — set once.
     shader.use();
@@ -36,8 +37,15 @@ public class ChromaticAberrationEffect extends BasePostProcessEffect {
     shader.unbind();
   }
 
-  public ChromaticAberrationEffect strength(float s) { this.strength = s; return this; }
-  public ChromaticAberrationEffect falloff(float f)  { this.falloff  = f; return this; }
+  public ChromaticAberrationEffect strength(float s) {
+    this.strength = s;
+    return this;
+  }
+
+  public ChromaticAberrationEffect falloff(float f) {
+    this.falloff = f;
+    return this;
+  }
 
   @Override
   public void applyEffect(int colorTex, int depthTex) {
@@ -47,7 +55,7 @@ public class ChromaticAberrationEffect extends BasePostProcessEffect {
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, colorTex);
 
     GL20.glUniform1f(uStrength, strength);
-    GL20.glUniform1f(uFalloff,  falloff);
+    GL20.glUniform1f(uFalloff, falloff);
 
     quad.draw();
     shader.unbind();
