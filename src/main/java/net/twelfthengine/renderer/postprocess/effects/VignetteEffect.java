@@ -5,71 +5,64 @@ import net.twelfthengine.renderer.postprocess.FullscreenQuad;
 import net.twelfthengine.renderer.shader.ShaderProgram;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL20;
 
 public class VignetteEffect extends BasePostProcessEffect {
 
-  private final ShaderProgram shader;
+  private final ShaderProgram  shader;
   private final FullscreenQuad quad;
 
-  /** Radius of the clear center (0–1). Higher = larger clear area. */
-  private float radius = 0.75f;
-
-  /** Softness of the vignette falloff. Higher = softer edge. */
+  private float radius   = 0.75f;
   private float softness = 0.45f;
-
-  /** Darkness of the vignette (0 = invisible, 1 = fully black). */
   private float strength = 0.85f;
 
-  /** Vignette tint color (default black). */
-  private float[] color = {0f, 0f, 0f};
+  // FIX: Flat floats instead of float[] — no allocation on color() setter call.
+  private float colorR = 0f, colorG = 0f, colorB = 0f;
+
+  // FIX: Cached uniform locations.
+  private final int uColorTex;
+  private final int uRadius;
+  private final int uSoftness;
+  private final int uStrength;
+  private final int uColor;
 
   public VignetteEffect() throws Exception {
-    shader =
-        new ShaderProgram(
-            "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/vignette.frag");
+    shader = new ShaderProgram(
+        "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/vignette.frag");
     quad = new FullscreenQuad();
+
+    int prog = shader.getProgramId();
+    uColorTex = GL20.glGetUniformLocation(prog, "uColorTex");
+    uRadius   = GL20.glGetUniformLocation(prog, "uRadius");
+    uSoftness = GL20.glGetUniformLocation(prog, "uSoftness");
+    uStrength = GL20.glGetUniformLocation(prog, "uStrength");
+    uColor    = GL20.glGetUniformLocation(prog, "uColor");
+
+    // FIX: Sampler slot is constant — set once.
+    shader.use();
+    GL20.glUniform1i(uColorTex, 0);
+    shader.unbind();
   }
 
-  public VignetteEffect radius(float r) {
-    this.radius = r;
-    return this;
-  }
-
-  public VignetteEffect softness(float s) {
-    this.softness = s;
-    return this;
-  }
-
-  public VignetteEffect strength(float s) {
-    this.strength = s;
-    return this;
-  }
-
-  public VignetteEffect color(float r, float g, float b) {
-    this.color = new float[] {r, g, b};
-    return this;
-  }
+  public VignetteEffect radius(float r)                  { this.radius   = r; return this; }
+  public VignetteEffect softness(float s)                { this.softness = s; return this; }
+  public VignetteEffect strength(float s)                { this.strength = s; return this; }
+  public VignetteEffect color(float r, float g, float b) { colorR=r; colorG=g; colorB=b; return this; }
 
   @Override
   public void applyEffect(int colorTex, int depthTex) {
-    GL11.glDisable(GL11.GL_DEPTH_TEST);
-
     shader.use();
 
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, colorTex);
-    shader.setUniform1i("uColorTex", 0);
 
-    shader.setUniform1f("uRadius", radius);
-    shader.setUniform1f("uSoftness", softness);
-    shader.setUniform1f("uStrength", strength);
-    shader.setUniform3f("uColor", color[0], color[1], color[2]);
+    GL20.glUniform1f(uRadius,   radius);
+    GL20.glUniform1f(uSoftness, softness);
+    GL20.glUniform1f(uStrength, strength);
+    GL20.glUniform3f(uColor,    colorR, colorG, colorB);
 
     quad.draw();
     shader.unbind();
-
-    GL13.glActiveTexture(GL13.GL_TEXTURE0);
-    GL11.glEnable(GL11.GL_DEPTH_TEST);
   }
 
   @Override

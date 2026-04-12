@@ -5,53 +5,52 @@ import net.twelfthengine.renderer.postprocess.FullscreenQuad;
 import net.twelfthengine.renderer.shader.ShaderProgram;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL20;
 
 public class ChromaticAberrationEffect extends BasePostProcessEffect {
 
   private final ShaderProgram shader;
   private final FullscreenQuad quad;
 
-  /** How far apart the channels split at the screen edges (in UV units, e.g. 0.005). */
   private float strength = 0.005f;
+  private float falloff  = 1.0f;
 
-  /** 0 = uniform split, 1 = only at screen edges. */
-  private float falloff = 1.0f;
+  // FIX: Cached uniform locations — never call glGetUniformLocation per frame.
+  private final int uColorTex;
+  private final int uStrength;
+  private final int uFalloff;
 
   public ChromaticAberrationEffect() throws Exception {
-    shader =
-        new ShaderProgram(
-            "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/chromatic.frag");
+    shader = new ShaderProgram(
+        "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/chromatic.frag");
     quad = new FullscreenQuad();
+
+    int prog = shader.getProgramId();
+    uColorTex = GL20.glGetUniformLocation(prog, "uColorTex");
+    uStrength = GL20.glGetUniformLocation(prog, "uStrength");
+    uFalloff  = GL20.glGetUniformLocation(prog, "uFalloff");
+
+    // FIX: Sampler slot is constant — set once.
+    shader.use();
+    GL20.glUniform1i(uColorTex, 0);
+    shader.unbind();
   }
 
-  public ChromaticAberrationEffect strength(float s) {
-    this.strength = s;
-    return this;
-  }
-
-  public ChromaticAberrationEffect falloff(float f) {
-    this.falloff = f;
-    return this;
-  }
+  public ChromaticAberrationEffect strength(float s) { this.strength = s; return this; }
+  public ChromaticAberrationEffect falloff(float f)  { this.falloff  = f; return this; }
 
   @Override
   public void applyEffect(int colorTex, int depthTex) {
-    GL11.glDisable(GL11.GL_DEPTH_TEST);
-
     shader.use();
 
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, colorTex);
-    shader.setUniform1i("uColorTex", 0);
 
-    shader.setUniform1f("uStrength", strength);
-    shader.setUniform1f("uFalloff", falloff);
+    GL20.glUniform1f(uStrength, strength);
+    GL20.glUniform1f(uFalloff,  falloff);
 
     quad.draw();
     shader.unbind();
-
-    GL13.glActiveTexture(GL13.GL_TEXTURE0);
-    GL11.glEnable(GL11.GL_DEPTH_TEST);
   }
 
   @Override

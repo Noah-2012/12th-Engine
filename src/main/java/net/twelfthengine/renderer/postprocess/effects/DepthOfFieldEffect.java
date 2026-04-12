@@ -5,89 +5,80 @@ import net.twelfthengine.renderer.postprocess.FullscreenQuad;
 import net.twelfthengine.renderer.shader.ShaderProgram;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL20;
 
 public class DepthOfFieldEffect extends BasePostProcessEffect {
 
   private final ShaderProgram shader;
   private final FullscreenQuad quad;
 
-  /** Linear depth (world units) of the focal plane. */
   private float focalDistance = 10.0f;
+  private float focalRange    = 6.0f;
+  private float maxBlur       = 8.0f;
+  private float near          = 0.1f;
+  private float far           = 1000f;
+  private int   samples       = 12;
 
-  /** Distance over which the blur transitions in (world units). */
-  private float focalRange = 6.0f;
-
-  /** Maximum blur radius in pixels. */
-  private float maxBlur = 8.0f;
-
-  private float near = 0.1f;
-  private float far = 1000f;
-
-  /** Number of blur samples (performance vs quality). */
-  private int samples = 12;
+  // FIX: Cached uniform locations.
+  private final int uColorTex;
+  private final int uDepthTex;
+  private final int uFocalDistance;
+  private final int uFocalRange;
+  private final int uMaxBlur;
+  private final int uNear;
+  private final int uFar;
+  private final int uSamples;
 
   public DepthOfFieldEffect() throws Exception {
-    shader =
-        new ShaderProgram("/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/dof.frag");
+    shader = new ShaderProgram(
+        "/shaders/postprocess/fullscreen.vert", "/shaders/postprocess/dof.frag");
     quad = new FullscreenQuad();
+
+    int prog = shader.getProgramId();
+    uColorTex     = GL20.glGetUniformLocation(prog, "uColorTex");
+    uDepthTex     = GL20.glGetUniformLocation(prog, "uDepthTex");
+    uFocalDistance = GL20.glGetUniformLocation(prog, "uFocalDistance");
+    uFocalRange   = GL20.glGetUniformLocation(prog, "uFocalRange");
+    uMaxBlur      = GL20.glGetUniformLocation(prog, "uMaxBlur");
+    uNear         = GL20.glGetUniformLocation(prog, "uNear");
+    uFar          = GL20.glGetUniformLocation(prog, "uFar");
+    uSamples      = GL20.glGetUniformLocation(prog, "uSamples");
+
+    // FIX: Sampler slots are constants — set once.
+    shader.use();
+    GL20.glUniform1i(uColorTex, 0);
+    GL20.glUniform1i(uDepthTex, 1);
+    shader.unbind();
   }
 
-  public DepthOfFieldEffect focalDistance(float d) {
-    this.focalDistance = d;
-    return this;
-  }
-
-  public DepthOfFieldEffect focalRange(float r) {
-    this.focalRange = r;
-    return this;
-  }
-
-  public DepthOfFieldEffect maxBlur(float m) {
-    this.maxBlur = m;
-    return this;
-  }
-
-  public DepthOfFieldEffect near(float n) {
-    this.near = n;
-    return this;
-  }
-
-  public DepthOfFieldEffect far(float f) {
-    this.far = f;
-    return this;
-  }
-
-  public DepthOfFieldEffect samples(int s) {
-    this.samples = s;
-    return this;
-  }
+  public DepthOfFieldEffect focalDistance(float d) { this.focalDistance = d; return this; }
+  public DepthOfFieldEffect focalRange(float r)    { this.focalRange    = r; return this; }
+  public DepthOfFieldEffect maxBlur(float m)       { this.maxBlur       = m; return this; }
+  public DepthOfFieldEffect near(float n)          { this.near          = n; return this; }
+  public DepthOfFieldEffect far(float f)           { this.far           = f; return this; }
+  public DepthOfFieldEffect samples(int s)         { this.samples       = s; return this; }
 
   @Override
   public void applyEffect(int colorTex, int depthTex) {
-    GL11.glDisable(GL11.GL_DEPTH_TEST);
-
     shader.use();
 
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, colorTex);
-    shader.setUniform1i("uColorTex", 0);
-
     GL13.glActiveTexture(GL13.GL_TEXTURE1);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, depthTex);
-    shader.setUniform1i("uDepthTex", 1);
 
-    shader.setUniform1f("uFocalDistance", focalDistance);
-    shader.setUniform1f("uFocalRange", focalRange);
-    shader.setUniform1f("uMaxBlur", maxBlur);
-    shader.setUniform1f("uNear", near);
-    shader.setUniform1f("uFar", far);
-    shader.setUniform1i("uSamples", samples);
+    GL20.glUniform1f(uFocalDistance, focalDistance);
+    GL20.glUniform1f(uFocalRange,    focalRange);
+    GL20.glUniform1f(uMaxBlur,       maxBlur);
+    GL20.glUniform1f(uNear,          near);
+    GL20.glUniform1f(uFar,           far);
+    GL20.glUniform1i(uSamples,       samples);
 
     quad.draw();
     shader.unbind();
 
+    // Reset active texture unit back to 0 as a courtesy to subsequent effects.
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
-    GL11.glEnable(GL11.GL_DEPTH_TEST);
   }
 
   @Override

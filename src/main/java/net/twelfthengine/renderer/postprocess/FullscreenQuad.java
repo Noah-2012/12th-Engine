@@ -7,22 +7,37 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
+/**
+ * FullscreenQuad — uploads two triangles covering clip-space and draws them.
+ *
+ * <p><b>NOTE:</b> {@link PostProcessPipeline} already uses the zero-VBO
+ * {@code gl_VertexID} triangle trick, which is strictly cheaper than this
+ * class (no VBO allocation, no buffer upload, no attribute pointer setup,
+ * one less bind per draw).  If you are writing a new effect shader, prefer
+ * that approach and use the pipeline's dummy VAO directly.
+ *
+ * <p>This class is kept for any existing effect that was wired up to it
+ * before the pipeline was updated.  If nothing outside the post-process
+ * package references it, it is safe to delete.
+ */
 public class FullscreenQuad {
 
   private final int vaoId;
   private final int vboId;
 
   public FullscreenQuad() {
-    // Two triangles covering clip space (-1 to 1)
     float[] verts = {
-      -1f, -1f,
-      1f, -1f,
-      1f, 1f,
-      -1f, -1f,
-      1f, 1f,
-      -1f, 1f,
+            -1f, -1f,
+            1f, -1f,
+            1f,  1f,
+            -1f, -1f,
+            1f,  1f,
+            -1f,  1f,
     };
 
+    // The FloatBuffer is only needed during construction to upload data to
+    // the GPU.  It is intentionally not stored as a field — it can be GC'd
+    // immediately after glBufferData returns.
     FloatBuffer buf = BufferUtils.createFloatBuffer(verts.length);
     buf.put(verts).flip();
 

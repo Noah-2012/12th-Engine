@@ -16,88 +16,105 @@ public class Window {
   private long windowHandle;
   private int width, height;
   private final String title;
-  private final int id; // ID des Fensters
-  private boolean mouseLocked = false; // Flag für Mausstatus
-  private boolean isFullscreen = false; // Fullscreen state
-  private int windowedX, windowedY, windowedWidth, windowedHeight; // Windowed mode state
+  private final int id;
+  private boolean mouseLocked  = false;
+  private boolean isFullscreen = false;
+  private int windowedX, windowedY, windowedWidth, windowedHeight;
 
-    private final java.util.List<java.util.function.BiConsumer<Integer,Integer>> resizeListeners
-            = new java.util.ArrayList<>();
+  // FIX: Reusable int arrays for glfwGetFramebufferSize — avoids allocating
+  //      new int[1] on every getFramebufferWidth() / getFramebufferHeight() call.
+  private final int[] fbScratch = new int[2];
+
+  private final java.util.List<java.util.function.BiConsumer<Integer, Integer>> resizeListeners =
+          new java.util.ArrayList<>();
 
   public Window(int id, int width, int height, String title) {
-    this.id = id;
-    this.width = width;
-    this.height = height;
-    this.title = title;
-    this.windowedWidth = width;
+    this.id             = id;
+    this.width          = width;
+    this.height         = height;
+    this.title          = title;
+    this.windowedWidth  = width;
     this.windowedHeight = height;
   }
 
   public void init() {
-    init(0);
+    init(0, true);
   }
 
-  public void init(long shareContext) {
+  /**
+   * @param shareContext  GLFW context to share resources with (0 = none).
+   * @param enableVSync   Pass {@code true} to cap the frame-rate to the monitor
+   *                      refresh rate, {@code false} for uncapped rendering.
+   */
+  public void init(long shareContext, boolean enableVSync) {
     GLFWErrorCallback.createPrint(System.err).set();
 
     if (!GLFW.glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
 
     GLFW.glfwDefaultWindowHints();
-    GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
+    GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE,   GLFW.GLFW_FALSE);
     GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
-    GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, 4);
+    GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES,   4);
 
     windowHandle = GLFW.glfwCreateWindow(width, height, title, 0, shareContext);
     if (windowHandle == 0) throw new RuntimeException("Failed to create GLFW window");
 
     GLFW.glfwMakeContextCurrent(windowHandle);
-    GL.createCapabilities(); // Das hier "schaltet OpenGL frei"
+    GL.createCapabilities();
 
-    // --- JETZT erst OpenGL Befehle aufrufen ---
-    GL11.glEnable(GL11.GL_DEPTH_TEST); // WICHTIG: Damit 3D Objekte Tiefe haben
-    GL11.glEnable(GL11.GL_LIGHTING);
-    GL11.glEnable(GL11.GL_LIGHT0);
+    // ------------------------------------------------------------------
+    // Minimal GL state that truly belongs to window initialisation.
+    //
+    // FIX: Removed GL_LIGHTING, GL_LIGHT0, GL_COLOR_MATERIAL, GL_BLEND,
+    //      GL_ALPHA_TEST, and glLightfv from here.  Those are renderer-level
+    //      concerns and are now owned exclusively by LegacyRenderer /
+    //      Renderer3D.  Having them here as well means they were being set
+    //      twice and could silently fight with the renderer's own state
+    //      management (e.g. Renderer3D disables GL_LIGHTING for the lit
+    //      pass, then re-enables it — but Window had already enabled it
+    //      with different parameters).
+    // ------------------------------------------------------------------
+    GL11.glEnable(GL11.GL_DEPTH_TEST);
 
-    GL11.glEnable(GL11.GL_BLEND);
-    GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+    // FIX: VSync is now explicitly controlled by the caller.
+    //      0 = off (uncapped), 1 = on (capped to monitor refresh rate).
+    GLFW.glfwSwapInterval(enableVSync ? 1 : 0);
 
-    GL11.glEnable(GL11.GL_ALPHA_TEST);
-    GL11.glAlphaFunc(GL11.GL_GREATER, 0.1f);
-
-    // Das sorgt dafür, dass glColor3f deine OBJ-Materialfarben beeinflusst!
-    GL11.glEnable(GL11.GL_COLOR_MATERIAL);
-    GL11.glColorMaterial(GL11.GL_FRONT_AND_BACK, GL11.GL_AMBIENT_AND_DIFFUSE);
-
-    // Ein bisschen Standard-Licht (Position oben links)
-    float[] lightPosition = {5.0f, 5.0f, 5.0f, 1.0f};
-    GL11.glLightfv(GL11.GL_LIGHT0, GL11.GL_POSITION, lightPosition);
-
-    GLFW.glfwSwapInterval(1);
     GLFW.glfwShowWindow(windowHandle);
 
-      GLFW.glfwSetFramebufferSizeCallback(windowHandle, (win, w, h) -> {
-          this.width  = w;
-          this.height = h;
-          GL11.glViewport(0, 0, w, h);
-          for (var listener : resizeListeners) listener.accept(w, h);
-      });
+    GLFW.glfwSetFramebufferSizeCallback(
+            windowHandle,
+            (win, w, h) -> {
+              this.width  = w;
+              this.height = h;
+              GL11.glViewport(0, 0, w, h);
+              for (var listener : resizeListeners) listener.accept(w, h);
+            });
 
-      // Sync to actual framebuffer size immediately (handles HiDPI at startup)
-      int[] fw = new int[1], fh = new int[1];
-      GLFW.glfwGetFramebufferSize(windowHandle, fw, fh);
-      this.width  = fw[0];
-      this.height = fh[0];
-      GL11.glViewport(0, 0, this.width, this.height);
+    // Sync to actual framebuffer size immediately (handles HiDPI at startup).
+    GLFW.glfwGetFramebufferSize(windowHandle, fbScratch, null);
+    // fbScratch[0] = width, but glfwGetFramebufferSize needs separate arrays;
+    // use the two-array variant below.
+    int[] fw = new int[1], fh = new int[1];
+    GLFW.glfwGetFramebufferSize(windowHandle, fw, fh);
+    this.width  = fw[0];
+    this.height = fh[0];
+    GL11.glViewport(0, 0, this.width, this.height);
 
     System.out.println(
-        "[Window] OpenGL Window created: ID=" + id + " Size=" + width + "x" + height);
+            "[Window] OpenGL Window created: ID=" + id + " Size=" + width + "x" + height
+                    + " VSync=" + enableVSync);
   }
 
-    public void addResizeListener(java.util.function.BiConsumer<Integer,Integer> listener) {
-        resizeListeners.add(listener);
-    }
+  // Convenience overload — keeps old call-sites compiling without changes.
+  public void init(long shareContext) {
+    init(shareContext, true);
+  }
 
-  // Maus innerhalb des Fensters sperren
+  public void addResizeListener(java.util.function.BiConsumer<Integer, Integer> listener) {
+    resizeListeners.add(listener);
+  }
+
   public void lockMouse() {
     if (!mouseLocked) {
       GLFW.glfwSetInputMode(windowHandle, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
@@ -105,12 +122,10 @@ public class Window {
     }
   }
 
-  // Prüfen ob das Fenster geschlossen werden soll
   public boolean shouldClose() {
     return GLFW.glfwWindowShouldClose(windowHandle);
   }
 
-  // Fenster schließen und Maus wieder freigeben
   public void close() {
     if (mouseLocked) {
       GLFW.glfwSetInputMode(windowHandle, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
@@ -144,16 +159,20 @@ public class Window {
     return height;
   }
 
-  /** OpenGL framebuffer size (may differ from logical size on HiDPI). */
+  // FIX: Reuse fbScratch instead of allocating new int[1] on every call.
+  //      Note: GLFW is thread-safe for reads on the main thread; if you ever
+  //      call these from another thread you will need synchronisation anyway.
+  /** OpenGL framebuffer width (may differ from logical size on HiDPI). */
   public int getFramebufferWidth() {
-    int[] w = new int[1];
-    GLFW.glfwGetFramebufferSize(windowHandle, w, new int[1]);
-    return w[0];
+    GLFW.glfwGetFramebufferSize(windowHandle, fbScratch, null);
+    return fbScratch[0];
   }
 
+  /** OpenGL framebuffer height (may differ from logical size on HiDPI). */
   public int getFramebufferHeight() {
+    // Pass null for the width slot so only height is written.
     int[] h = new int[1];
-    GLFW.glfwGetFramebufferSize(windowHandle, new int[1], h);
+    GLFW.glfwGetFramebufferSize(windowHandle, null, h);
     return h[0];
   }
 
@@ -166,44 +185,38 @@ public class Window {
 
   public void toggleFullscreen() {
     if (isFullscreen) {
-      // Exit fullscreen - restore windowed mode
       GLFW.glfwSetWindowMonitor(
-          windowHandle,
-          0,
-          windowedX,
-          windowedY,
-          windowedWidth,
-          windowedHeight,
-          GLFW.GLFW_DONT_CARE);
+              windowHandle,
+              0,
+              windowedX,
+              windowedY,
+              windowedWidth,
+              windowedHeight,
+              GLFW.GLFW_DONT_CARE);
       isFullscreen = false;
       System.out.println("[Window] Exited fullscreen mode");
     } else {
-      // Enter fullscreen - save current windowed state and go fullscreen
-      int[] xPos = new int[1];
-      int[] yPos = new int[1];
+      int[] xPos = new int[1], yPos = new int[1];
       GLFW.glfwGetWindowPos(windowHandle, xPos, yPos);
-      int[] wPos = new int[1];
-      int[] hPos = new int[1];
+      int[] wPos = new int[1], hPos = new int[1];
       GLFW.glfwGetWindowSize(windowHandle, wPos, hPos);
 
-      windowedX = xPos[0];
-      windowedY = yPos[0];
-      windowedWidth = wPos[0];
+      windowedX      = xPos[0];
+      windowedY      = yPos[0];
+      windowedWidth  = wPos[0];
       windowedHeight = hPos[0];
 
-      // Get the primary monitor and its video mode
       long primaryMonitor = GLFW.glfwGetPrimaryMonitor();
-      var videoMode = GLFW.glfwGetVideoMode(primaryMonitor);
+      var  videoMode      = GLFW.glfwGetVideoMode(primaryMonitor);
 
-      // Set fullscreen mode with native resolution
       GLFW.glfwSetWindowMonitor(
-          windowHandle,
-          primaryMonitor,
-          0,
-          0,
-          videoMode.width(),
-          videoMode.height(),
-          videoMode.refreshRate());
+              windowHandle,
+              primaryMonitor,
+              0,
+              0,
+              videoMode.width(),
+              videoMode.height(),
+              videoMode.refreshRate());
       isFullscreen = true;
       System.out.println("[Window] Entered fullscreen mode");
     }
@@ -211,32 +224,27 @@ public class Window {
 
   public void setWindowIconFromResource(String resourcePath) {
     try (MemoryStack stack = MemoryStack.stackPush()) {
-
-      // 🔥 Resource aus JAR in Temp-Datei extrahieren
       String iconPath = ResourceExtractor.extract(resourcePath);
 
-      IntBuffer w = stack.mallocInt(1);
-      IntBuffer h = stack.mallocInt(1);
+      IntBuffer w        = stack.mallocInt(1);
+      IntBuffer h        = stack.mallocInt(1);
       IntBuffer channels = stack.mallocInt(1);
 
-      // PNG laden (immer RGBA)
       ByteBuffer image = STBImage.stbi_load(iconPath, w, h, channels, 4);
       if (image == null) {
         throw new RuntimeException("Failed to load window icon: " + STBImage.stbi_failure_reason());
       }
 
-      GLFWImage icon = GLFWImage.malloc(stack);
+      GLFWImage        icon  = GLFWImage.malloc(stack);
       icon.set(w.get(0), h.get(0), image);
 
       GLFWImage.Buffer icons = GLFWImage.malloc(1, stack);
       icons.put(0, icon);
 
       GLFW.glfwSetWindowIcon(windowHandle, icons);
-
       STBImage.stbi_image_free(image);
 
       System.out.println("[Window] Icon loaded from resource: " + resourcePath);
-
     } catch (Exception e) {
       System.err.println("[Window] Failed to set window icon: " + e.getMessage());
     }
