@@ -188,7 +188,10 @@ public class ModelEntity extends BasicEntity implements Renderable3D {
     if (vbo == null) return;
 
     Matrix4f model = renderer.modelMatrixForModel(this, vbo);
-    Matrix4f mvp = new Matrix4f(lightSpace).mul(model);
+    // FIX: reuse Renderer3D's MVP scratch instead of `new Matrix4f(lightSpace)`
+    //      every entity every shadow pass. `.set(...)` copies lightSpace in,
+    //      `.mul(model)` applies the multiplication in place.
+    Matrix4f mvp = renderer.getLightMvpScratch().set(lightSpace).mul(model);
     vbo.renderDepth(depthShader, mvp);
   }
 }

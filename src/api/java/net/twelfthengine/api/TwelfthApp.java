@@ -39,6 +39,15 @@ public abstract class TwelfthApp {
       throws Exception;
 
   /**
+   * Called every frame inside the ImGui context (after ImGui.newFrame() and before ImGui.render()).
+   * Override this method to draw your own ImGui windows (e.g., the Lua script editor).
+   *
+   * @param window the game window
+   * @param world the current world
+   */
+  public void onRenderImGui(Window window, World world) {}
+
+  /**
    * Called every fixed game tick at the rate defined in AppConfig.
    *
    * @param deltaTime fixed tick time in seconds

@@ -15,27 +15,34 @@ public class MotionBlurEffect extends BasePostProcessEffect {
   private final FullscreenQuad quad;
 
   // ---------------------------------------------------------------
-  // Temporal state
-  // FIX: All Matrix4f instances are now permanent fields reused each frame.
-  //      Previously, new Matrix4f(...) was called 3-4 times per frame inside
-  //      applyEffect() and blitPassthrough() — pure GC pressure.
+  // Temporal matrices
+  //
+  // ORDERING CONTRACT (critical for correctness):
+  //
+  //   Each frame must follow this exact sequence:
+  //     1. Render scene
+  //     2. effect.updateMatrices(currentVP)   <- records currVP
+  //     3. pipeline.present()                 <- calls applyEffect()
+  //
+  //   Inside applyEffect(), prevVP is already holding last frame's matrix.
+  //   At the END of applyEffect() we copy currVP into prevVP for next frame.
+  //
+  //   If updateMatrices() is called AFTER present() the two matrices will
+  //   be identical every frame -> zero velocity -> invisible blur.
   // ---------------------------------------------------------------
   private final Matrix4f prevVP = new Matrix4f();
   private final Matrix4f currVP = new Matrix4f();
   private final Matrix4f invVP = new Matrix4f();
-  private final Matrix4f identity = new Matrix4f(); // permanent identity, never mutated
+  private final Matrix4f identity = new Matrix4f(); // never mutated
 
-  // FIX: Merged firstFrame + historyValid into a single warmupFrames counter.
-  //      The original two booleans expressed the same concept with an ambiguous
-  //      interaction order — this is clearer and cheaper.
-  private int warmupFrames = 2; // skip blur for 2 frames to seed prevVP cleanly
+  private int warmupFrames = 2;
   private boolean hasCurrVP = false;
 
   private float blurStrength = 0.5f;
   private int samples = 8;
   private int debugMode = 0;
 
-  // FIX: Cached uniform locations — no glGetUniformLocation per frame.
+  // Cached uniform locations
   private final int uInvVP;
   private final int uPrevVP;
   private final int uColorTex;
@@ -46,11 +53,7 @@ public class MotionBlurEffect extends BasePostProcessEffect {
   private final int uFar;
   private final int uDebugMode;
 
-  // FIX: Cached FloatBuffer for matrix upload — no BufferUtils.createFloatBuffer per frame.
-  //      One buffer is enough because we upload one matrix at a time synchronously.
   private final java.nio.FloatBuffer matBuf = BufferUtils.createFloatBuffer(16);
-
-  // FIX: Scratch float array for isMatrixValid — no new float[16] per call.
   private final float[] matArr = new float[16];
 
   public MotionBlurEffect() throws Exception {
@@ -70,7 +73,6 @@ public class MotionBlurEffect extends BasePostProcessEffect {
     uFar = GL20.glGetUniformLocation(prog, "uFar");
     uDebugMode = GL20.glGetUniformLocation(prog, "uDebugMode");
 
-    // FIX: Sampler slots are constants — set once.
     shader.use();
     GL20.glUniform1i(uColorTex, 0);
     GL20.glUniform1i(uDepthTex, 1);
@@ -93,8 +95,10 @@ public class MotionBlurEffect extends BasePostProcessEffect {
   }
 
   /**
-   * Call every frame from the renderer after the world render, before present(). FIX: Uses
-   * Matrix4f.set() instead of new Matrix4f(src) — no allocation.
+   * Call every frame BEFORE pipeline.present(), after the scene has been rendered.
+   *
+   * <p>Correct order per frame: motionBlur.updateMatrices(renderer.getLastVP());
+   * pipeline.present();
    */
   public void updateMatrices(Matrix4f currentVP) {
     currVP.set(currentVP);
@@ -109,7 +113,6 @@ public class MotionBlurEffect extends BasePostProcessEffect {
   @Override
   public void applyEffect(int colorTex, int depthTex) {
     if (!hasCurrVP || warmupFrames > 0) {
-      // Seed prevVP so the next real frame has a valid history, then passthrough.
       if (hasCurrVP) {
         prevVP.set(currVP);
         warmupFrames--;
@@ -118,18 +121,22 @@ public class MotionBlurEffect extends BasePostProcessEffect {
       return;
     }
 
-    // FIX: invert into the cached invVP field — no new Matrix4f allocation.
-    currVP.invert(invVP);
-
+    // FIX: prevVP already holds the PREVIOUS frame's matrix on entry here.
+    //      We use it for the blur, then update it to currVP at the end.
+    //      The old code had prevVP.set(currVP) at the bottom but updateMatrices()
+    //      was overwriting currVP after present(), making them equal every frame.
     if (!isMatrixValid(prevVP)) {
       prevVP.set(currVP);
+      blitPassthrough(colorTex, depthTex);
+      return;
     }
+
+    currVP.invert(invVP);
 
     shader.use();
 
-    // FIX: Upload matrices via the cached matBuf — no BufferUtils.createFloatBuffer.
     uploadMatrix(uInvVP, invVP);
-    uploadMatrix(uPrevVP, prevVP);
+    uploadMatrix(uPrevVP, prevVP); // prevVP = genuine last-frame matrix
 
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
     GL11.glBindTexture(GL11.GL_TEXTURE_2D, colorTex);
@@ -145,16 +152,12 @@ public class MotionBlurEffect extends BasePostProcessEffect {
     quad.draw();
     shader.unbind();
 
-    // Update history AFTER blur has consumed prevVP.
+    // Advance history: this frame's currVP becomes next frame's prevVP.
     prevVP.set(currVP);
 
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
   }
 
-  /**
-   * Copies colorTex unchanged. Used during warmup frames so output is never black. FIX: Uses the
-   * permanent identity field — no new Matrix4f() allocation.
-   */
   private void blitPassthrough(int colorTex, int depthTex) {
     shader.use();
 
@@ -177,17 +180,12 @@ public class MotionBlurEffect extends BasePostProcessEffect {
     GL13.glActiveTexture(GL13.GL_TEXTURE0);
   }
 
-  /** Uploads a Matrix4f into a uniform location using the cached FloatBuffer. */
   private void uploadMatrix(int location, Matrix4f mat) {
     matBuf.clear();
     mat.get(matBuf);
     GL20.glUniformMatrix4fv(location, false, matBuf);
   }
 
-  /**
-   * Returns false if the matrix is degenerate (near-zero determinant) or contains NaN/Inf. FIX:
-   * Uses the cached matArr scratch array — no new float[16] per call.
-   */
   private boolean isMatrixValid(Matrix4f m) {
     float det = m.determinant();
     if (Math.abs(det) < 1e-6f) {

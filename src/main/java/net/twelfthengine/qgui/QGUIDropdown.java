@@ -17,7 +17,7 @@ public class QGUIDropdown extends QGUIElement {
 
   @Override
   public void update(
-      int mx, int my, boolean mousePressed, boolean mouseDown, int parentX, int parentY) {
+          int mx, int my, boolean mousePressed, boolean mouseDown, int parentX, int parentY) {
     int absX = parentX + localX;
     int absY = parentY + localY;
 
@@ -27,9 +27,9 @@ public class QGUIDropdown extends QGUIElement {
       hoveredOption = -1;
       // Check if hovering over the open list
       if (mx >= absX
-          && mx <= absX + width
-          && my > absY + height
-          && my <= absY + height + (options.size() * height)) {
+              && mx <= absX + width
+              && my > absY + height
+              && my <= absY + height + (options.size() * height)) {
         hoveredOption = (my - (absY + height)) / height;
 
         if (mousePressed && hoveredOption < options.size()) {

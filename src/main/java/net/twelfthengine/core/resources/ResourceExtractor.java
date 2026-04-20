@@ -2,6 +2,7 @@ package net.twelfthengine.core.resources;
 
 import java.io.*;
 import java.nio.file.*;
+import net.twelfthengine.core.logger.Logger;
 
 public class ResourceExtractor {
 
@@ -10,17 +11,25 @@ public class ResourceExtractor {
   static {
     try {
       TEMP_DIR = Files.createTempDirectory("twelfthengine_");
-      // Delete the temp dir and its contents when the JVM exits
+      Logger.info("ResourceExtractor", "Temp directory created: " + TEMP_DIR.toAbsolutePath());
+
       Runtime.getRuntime()
           .addShutdownHook(
               new Thread(
                   () -> {
+                    Logger.info("ResourceExtractor", "Cleaning up temp directory: " + TEMP_DIR);
                     try {
                       deleteDirectory(TEMP_DIR.toFile());
-                    } catch (IOException ignored) {
+                      Logger.info("ResourceExtractor", "Temp directory deleted successfully.");
+                    } catch (IOException e) {
+                      Logger.warn(
+                          "ResourceExtractor",
+                          "Failed to delete temp directory: " + e.getMessage());
                     }
                   }));
     } catch (IOException e) {
+      Logger.error(
+          "ResourceExtractor", "Fatal: Failed to create temp directory — " + e.getMessage());
       throw new RuntimeException("Failed to create temp directory for resources", e);
     }
   }
@@ -33,23 +42,26 @@ public class ResourceExtractor {
    * @return absolute filesystem path to the extracted temp file
    */
   public static String extract(String resourcePath) throws IOException {
-    // Normalise — ensure leading slash for getResourceAsStream
     String normalised = resourcePath.startsWith("/") ? resourcePath : "/" + resourcePath;
-
-    // Use the filename as the temp file name to keep it recognisable
     String fileName = Paths.get(normalised).getFileName().toString();
     Path dest = TEMP_DIR.resolve(fileName);
 
-    // Already extracted this session
     if (Files.exists(dest)) {
+      Logger.debug("ResourceExtractor", "Cache hit — skipping extraction for: " + normalised);
       return dest.toAbsolutePath().toString();
     }
 
+    Logger.info("ResourceExtractor", "Extracting resource to disk: " + normalised);
     try (InputStream in = ResourceExtractor.class.getResourceAsStream(normalised)) {
       if (in == null) {
+        Logger.error("ResourceExtractor", "Resource not found on classpath: " + normalised);
         throw new IOException("Resource not found on classpath: " + normalised);
       }
       Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
+      long sizeKb = Files.size(dest) / 1024;
+      Logger.info(
+          "ResourceExtractor",
+          "Extracted '" + fileName + "' → " + dest.toAbsolutePath() + " (" + sizeKb + " KB)");
     }
 
     return dest.toAbsolutePath().toString();
@@ -61,20 +73,30 @@ public class ResourceExtractor {
    */
   public static byte[] readBytes(String resourcePath) throws IOException {
     String normalised = resourcePath.startsWith("/") ? resourcePath : "/" + resourcePath;
+    Logger.debug("ResourceExtractor", "Reading resource bytes: " + normalised);
+
     try (InputStream in = ResourceExtractor.class.getResourceAsStream(normalised)) {
       if (in == null) {
+        Logger.error("ResourceExtractor", "Resource not found on classpath: " + normalised);
         throw new IOException("Resource not found on classpath: " + normalised);
       }
-      return in.readAllBytes();
+      byte[] data = in.readAllBytes();
+      Logger.debug("ResourceExtractor", "Read " + data.length + " bytes from: " + normalised);
+      return data;
     }
   }
 
   private static void deleteDirectory(File dir) throws IOException {
     if (dir.isDirectory()) {
-      for (File child : dir.listFiles()) {
-        deleteDirectory(child);
+      File[] children = dir.listFiles();
+      if (children != null) {
+        for (File child : children) {
+          deleteDirectory(child);
+        }
       }
     }
-    dir.delete();
+    if (!dir.delete()) {
+      Logger.warn("ResourceExtractor", "Could not delete: " + dir.getAbsolutePath());
+    }
   }
 }

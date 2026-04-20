@@ -55,9 +55,9 @@ public class QGUIMenuBar {
 
       // Prüfen ob Maus im Dropdown ist
       if (mx >= dropdownX
-          && mx <= dropdownX + dropdownWidth
-          && my >= dropdownY
-          && my <= dropdownY + dropdownHeight) {
+              && mx <= dropdownX + dropdownWidth
+              && my >= dropdownY
+              && my <= dropdownY + dropdownHeight) {
         clickedOnDropdown = mousePressed;
       }
 
@@ -65,9 +65,9 @@ public class QGUIMenuBar {
         int itemY = dropdownY + i * height;
 
         if (mx >= dropdownX
-            && mx <= dropdownX + dropdownWidth
-            && my >= itemY
-            && my <= itemY + height) {
+                && mx <= dropdownX + dropdownWidth
+                && my >= itemY
+                && my <= itemY + height) {
 
           hoveredItemIndex = i;
 

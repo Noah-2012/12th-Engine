@@ -8,12 +8,14 @@ import java.util.Locale;
 import net.twelfthengine.controls.InputManager;
 import net.twelfthengine.coord.iab.IAB;
 import net.twelfthengine.core.EngineObject;
+import net.twelfthengine.core.console.Console;
 import net.twelfthengine.core.discord.DiscordPresence;
 import net.twelfthengine.core.logger.Logger;
 import net.twelfthengine.core.profiler.EngineProfiler;
 import net.twelfthengine.core.tick.TickManager;
 import net.twelfthengine.core.tick.TickPhase;
 import net.twelfthengine.core.tick.TickProfiler;
+import net.twelfthengine.editor.SceneEditorWindow;
 import net.twelfthengine.entity.camera.CameraEntity;
 import net.twelfthengine.gui.PauseMenuScreen;
 import net.twelfthengine.gui.VideoIntroScreen;
@@ -32,6 +34,8 @@ public class EngineBootstrap {
 
   private static ImGuiImplGlfw imGuiGlfw;
   private static ImGuiImplGl3 imGuiGl3;
+
+  public static double DISCORD_INTERVAL = 5.0;
 
   public static void run(TwelfthApp app, AppConfig config) throws Exception {
 
@@ -97,6 +101,9 @@ public class EngineBootstrap {
     // ------------------------------------------------------------------
     RenderPipeline pipeline =
         app.onSetupRenderer(world, config, window, renderer2D, renderer3D, textRenderer);
+
+    SceneEditorWindow sceneEditor = new SceneEditorWindow(window, world);
+    sceneEditor.registerInPipeline(pipeline);
     Logger.info("Startup", "Game render pipeline ready");
 
     // ------------------------------------------------------------------
@@ -303,7 +310,11 @@ public class EngineBootstrap {
     TickProfiler tickProfiler = new TickProfiler(config.tickRate());
 
     long discordLastUpdate = System.nanoTime();
-    double DISCORD_INTERVAL = 5.0;
+
+    Console.bindFloat(
+        "cv_discord_interval",
+        () -> (float) DISCORD_INTERVAL,
+        v -> DISCORD_INTERVAL = v.doubleValue());
 
     // ------------------------------------------------------------------
     // Main loop
@@ -313,6 +324,7 @@ public class EngineBootstrap {
       long currentTime = System.nanoTime();
       float deltaTime = (currentTime - lastTime) / 1_000_000_000f;
       lastTime = currentTime;
+      float alpha = (float) (accumulator / tickTime);
 
       GLFW.glfwPollEvents();
       InputManager.update();
@@ -333,7 +345,11 @@ public class EngineBootstrap {
       imGuiGlfw.newFrame();
       ImGui.newFrame();
 
-      engineProfiler.render(world, window, paused[0]);
+      if (showDebugOverlay[0]) {
+        engineProfiler.render(world, window, paused[0]);
+      }
+
+      app.onRenderImGui(window, world);
 
       // ----------------------------------------------------------------
       // Key toggles
@@ -361,6 +377,14 @@ public class EngineBootstrap {
 
       // ----------------------------------------------------------------
       // Fixed-rate tick
+      //
+      // NOTE: Only the EXPENSIVE mesh-precise collision resolver runs in
+      //       the tick loop (via World.updateMeshCollisions). Entity input
+      //       reading, rotation, physics integration, and cheap collisions
+      //       still run at frame rate inside World.update() below — that's
+      //       essential for mouse-look responsiveness and for edge-triggered
+      //       events like isKeyPressed(SPACE) for jump, which InputManager
+      //       clears every frame.
       // ----------------------------------------------------------------
       accumulator += deltaTime;
       while (accumulator >= tickTime) {
@@ -375,6 +399,7 @@ public class EngineBootstrap {
         tickProfiler.startTick();
         tickManager.fire(TickPhase.PRE, tickTime);
         app.onTick(tickTime);
+        if (!paused[0]) engine.getWorld().updateMeshCollisions((float) tickTime);
         tickManager.fire(TickPhase.POST, tickTime);
         tickProfiler.endTick();
         accumulator -= tickTime;
@@ -386,6 +411,7 @@ public class EngineBootstrap {
       // Pause / resume
       // ----------------------------------------------------------------
       if (InputManager.isKeyPressed(GLFW.GLFW_KEY_ESCAPE)) {
+        renderer3D.logCacheStats();
         paused[0] = !paused[0];
         if (paused[0]) window.unlockMouse();
         else window.lockMouse();
@@ -402,7 +428,10 @@ public class EngineBootstrap {
       }
 
       // ----------------------------------------------------------------
-      // World update (skipped while paused)
+      // World update (skipped while paused). Runs at frame rate so mouse
+      // look, WASD, jump edge-trigger, and camera physics integration all
+      // stay fully responsive. Only the expensive mesh-precise collision
+      // loop lives on the tick thread (see World.updateMeshCollisions above).
       // ----------------------------------------------------------------
       if (!paused[0]) engine.getWorld().update(deltaTime);
 
@@ -423,7 +452,8 @@ public class EngineBootstrap {
       GLFW.glfwMakeContextCurrent(window.getHandle());
       engine.getWorld().setActiveCamera(world.getActiveCamera());
 
-      RenderContext ctx = new RenderContext(window, engine.getWorld(), renderer2D, renderer3D);
+      RenderContext ctx =
+          new RenderContext(window, engine.getWorld(), renderer2D, renderer3D, deltaTime);
       pipeline.renderFrame(ctx);
       ImGui.render();
       imGuiGl3.renderDrawData(ImGui.getDrawData());

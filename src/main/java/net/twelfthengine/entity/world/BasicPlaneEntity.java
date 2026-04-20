@@ -26,7 +26,9 @@ public class BasicPlaneEntity extends BasicEntity
       net.twelfthengine.renderer.shader.ShaderProgram depthShader,
       org.joml.Matrix4f lightSpace) {
     org.joml.Matrix4f model = renderer.modelMatrixForPlane(this);
-    org.joml.Matrix4f mvp = new org.joml.Matrix4f(lightSpace).mul(model);
+    // FIX: reuse Renderer3D's MVP scratch instead of `new Matrix4f(lightSpace)`
+    //      (one allocation per plane per shadow pass in the old code).
+    org.joml.Matrix4f mvp = renderer.getLightMvpScratch().set(lightSpace).mul(model);
     renderer.getPlaneMesh().drawDepth(depthShader, mvp);
   }
 

@@ -1,15 +1,24 @@
 package net.twelfthengine.renderer.shadow;
 
+import net.twelfthengine.core.console.Console;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL30;
 
 public class ShadowFramebuffer {
 
-  public static final int SHADOW_MAP_SIZE = 8096;
+  public static int SHADOW_MAP_SIZE = 8096;
 
-  private final int fboId;
-  private final int depthTextureId;
+  private static int fboId = 0;
+  private static int depthTextureId = 0;
+
+  static {
+    Console.bindInt("cv_shadow_framebuffer_fboId", () -> fboId, v -> fboId = v);
+    Console.bindInt(
+        "cv_shadow_framebuffer_depthTextureId", () -> depthTextureId, v -> depthTextureId = v);
+    Console.bindInt(
+        "cv_shadow_framebuffer_map_size", () -> SHADOW_MAP_SIZE, v -> SHADOW_MAP_SIZE = v);
+  }
 
   public ShadowFramebuffer() {
     fboId = GL30.glGenFramebuffers();

@@ -10,11 +10,13 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
 
 public class VboModel {
+  private int vaoId;
   private int vboId;
   private final List<MaterialBatch> batches = new ArrayList<>();
-  private float size = 1.0f; // Default size
+  private float size = 1.0f;
 
   private static class MaterialBatch {
     String materialName;
@@ -25,7 +27,7 @@ public class VboModel {
   public VboModel(ObjModel model) {
     if (model == null) return;
 
-    // We gruppieren die Faces nach Material
+    // Group faces by material
     Map<String, List<ObjModel.Face>> groupedFaces = new HashMap<>();
     for (ObjModel.Face face : model.faces) {
       groupedFaces.computeIfAbsent(face.materialName, k -> new ArrayList<>()).add(face);
@@ -43,23 +45,21 @@ public class VboModel {
       List<ObjModel.Face> faces = entry.getValue();
       for (ObjModel.Face face : faces) {
         for (int i = 0; i < 3; i++) {
-          // Position (apply size scaling)
-          var v = model.vertices.get(face.vertexIndices[i]);
+          // Position
+          Vec3 v = model.vertices.get(face.vertexIndices[i]);
           buffer.put(v.x()).put(v.y()).put(v.z());
 
-          // Normale
-          var n =
-              face.hasNormals
-                  ? model.normals.get(face.normalIndices[i])
-                  : new net.twelfthengine.math.Vec3(0, 1, 0);
+          // Normal
+          Vec3 n = face.hasNormals ? model.normals.get(face.normalIndices[i]) : new Vec3(0, 1, 0);
           buffer.put(n.x()).put(n.y()).put(n.z());
 
-          // UV
-          var uv =
+          // UV (flip Y)
+          net.twelfthengine.math.Vec2f uv =
               face.hasUVs
                   ? model.uvs.get(face.uvIndices[i])
                   : new net.twelfthengine.math.Vec2f(0, 0);
           buffer.put(uv.x()).put(1.0f - uv.y());
+
           currentOffset++;
         }
       }
@@ -68,40 +68,46 @@ public class VboModel {
     }
     buffer.flip();
 
+    // Create VAO
+    vaoId = GL30.glGenVertexArrays();
+    GL30.glBindVertexArray(vaoId);
+
+    // Create VBO and upload data
     vboId = GL15.glGenBuffers();
     GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboId);
     GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, GL15.GL_STATIC_DRAW);
+
+    int stride = 8 * 4; // 8 floats per vertex: 3 pos, 3 normal, 2 uv
+
+    // Position attribute (location 0)
+    GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, stride, 0);
+    GL20.glEnableVertexAttribArray(0);
+
+    // Normal attribute (location 1)
+    GL20.glVertexAttribPointer(1, 3, GL11.GL_FLOAT, false, stride, 3 * 4);
+    GL20.glEnableVertexAttribArray(1);
+
+    // UV attribute (location 2)
+    GL20.glVertexAttribPointer(2, 2, GL11.GL_FLOAT, false, stride, 6 * 4);
+    GL20.glEnableVertexAttribArray(2);
+
+    // Unbind VAO (optional but good practice)
+    GL30.glBindVertexArray(0);
     GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
   }
 
-  private static float getScale(ObjModel model) {
-    float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
-    float maxX = Float.MIN_VALUE, maxY = Float.MIN_VALUE, maxZ = Float.MIN_VALUE;
-
-    for (var vertex : model.vertices) {
-      minX = Math.min(minX, vertex.x());
-      minY = Math.min(minY, vertex.y());
-      minZ = Math.min(minZ, vertex.z());
-      maxX = Math.max(maxX, vertex.x());
-      maxY = Math.max(maxY, vertex.y());
-      maxZ = Math.max(maxZ, vertex.z());
-    }
-
-    float maxSize = Math.max(Math.max(maxX - minX, maxY - minY), maxZ - minZ);
-    return (maxSize > 0) ? 1.0f / maxSize : 1.0f;
-  }
-
-  // Add size method
   public void setSize(float size) {
     this.size = Math.max(0.001f, size);
-    // Note: This won't update the existing VBO. For dynamic resizing,
-    // you'd need to recreate the VBO or use a uniform in shaders.
   }
 
   public float getSize() {
     return size;
   }
 
+  /**
+   * Legacy fixed-function rendering (used by LegacyRenderer). This still uses client-side arrays –
+   * if you never use the legacy path, you can remove this method entirely.
+   */
   public void render(ObjModel sourceModel) {
     GL11.glPushMatrix();
     GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboId);
@@ -128,7 +134,6 @@ public class VboModel {
           GL11.glColor3f(mat.diffuseColor.x(), mat.diffuseColor.y(), mat.diffuseColor.z());
         }
       }
-      // Nur den Teil des Buffers zeichnen, der zu diesem Material gehört
       GL11.glDrawArrays(GL11.GL_TRIANGLES, batch.startIndex, batch.vertexCount);
     }
 
@@ -139,26 +144,26 @@ public class VboModel {
     GL11.glPopMatrix();
   }
 
-  /** Depth-only pass for shadow map (position attribute only). */
+  /** Depth-only pass for shadow map (modern pipeline). */
   public void renderDepth(ShaderProgram shader, Matrix4f lightMvp) {
-    GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboId);
-    int stride = 8 * 4;
-    GL20.glEnableVertexAttribArray(0);
-    GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, stride, 0);
-    GL20.glDisableVertexAttribArray(1);
-    GL20.glDisableVertexAttribArray(2);
+    GL30.glBindVertexArray(vaoId);
 
-    shader.setUniformMatrix4fv("uLightMVP", false, ShaderProgram.matrixToBuffer(lightMvp));
+    // FIX: Use the non-deprecated Matrix4f overload which reuses
+    //      ShaderProgram's cached off-heap FloatBuffer instead of allocating
+    //      a fresh one via BufferUtils.createFloatBuffer(16) every call.
+    //      (Noted as a hazard in ShaderProgram.matrixToBuffer's deprecation
+    //      javadoc, and already fixed for MotionBlurEffect — now fixed here
+    //      too.) Saves ~1 direct NIO allocation per entity per shadow pass.
+    shader.setUniformMatrix4fv("uLightMVP", false, lightMvp);
 
     for (MaterialBatch batch : batches) {
       GL11.glDrawArrays(GL11.GL_TRIANGLES, batch.startIndex, batch.vertexCount);
     }
 
-    GL20.glDisableVertexAttribArray(0);
-    GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+    GL30.glBindVertexArray(0);
   }
 
-  /** Lit pass with shadows. Shadow map must already be bound to GL_TEXTURE1. */
+  /** Lit pass with shadows (modern pipeline). */
   public void renderLit(
       ObjModel sourceModel,
       ShaderProgram shader,
@@ -166,20 +171,23 @@ public class VboModel {
       Matrix4f view,
       Matrix4f projection,
       Matrix4f lightSpace) {
-    GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vboId);
-    int stride = 8 * 4;
-    GL20.glEnableVertexAttribArray(0);
-    GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, stride, 0);
-    GL20.glEnableVertexAttribArray(1);
-    GL20.glVertexAttribPointer(1, 3, GL11.GL_FLOAT, false, stride, 3L * 4);
-    GL20.glEnableVertexAttribArray(2);
-    GL20.glVertexAttribPointer(2, 2, GL11.GL_FLOAT, false, stride, 6L * 4);
 
-    shader.setUniformMatrix4fv("uModel", false, ShaderProgram.matrixToBuffer(model));
-    shader.setUniformMatrix4fv("uView", false, ShaderProgram.matrixToBuffer(view));
-    shader.setUniformMatrix4fv("uProjection", false, ShaderProgram.matrixToBuffer(projection));
-    shader.setUniformMatrix4fv(
-        "uLightSpaceMatrix", false, ShaderProgram.matrixToBuffer(lightSpace));
+    GL30.glBindVertexArray(vaoId);
+
+    // FIX: Same deprecated-allocation fix as renderDepth. Four matrix uploads
+    //      per entity per lit pass used to each allocate a fresh off-heap
+    //      FloatBuffer (~4 direct NIO allocs per entity per frame → GC
+    //      pressure through the JVM Cleaner). The overload below copies into
+    //      ShaderProgram's cached internal buffer instead.
+    //
+    //      NOTE: uView / uProjection / uLightSpaceMatrix are intentionally
+    //      still uploaded per-entity here rather than once per pass in
+    //      Renderer3D#renderLitScene, because hoisting them caused visual
+    //      regressions — keeping the original call order on purpose.
+    shader.setUniformMatrix4fv("uModel", false, model);
+    shader.setUniformMatrix4fv("uView", false, view);
+    shader.setUniformMatrix4fv("uProjection", false, projection);
+    shader.setUniformMatrix4fv("uLightSpaceMatrix", false, lightSpace);
 
     for (MaterialBatch batch : batches) {
       ObjModel.Material mat = sourceModel.materials.get(batch.materialName);
@@ -196,9 +204,12 @@ public class VboModel {
       GL11.glDrawArrays(GL11.GL_TRIANGLES, batch.startIndex, batch.vertexCount);
     }
 
-    GL20.glDisableVertexAttribArray(0);
-    GL20.glDisableVertexAttribArray(1);
-    GL20.glDisableVertexAttribArray(2);
-    GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+    GL30.glBindVertexArray(0);
+  }
+
+  /** Release GPU resources. */
+  public void dispose() {
+    GL30.glDeleteVertexArrays(vaoId);
+    GL15.glDeleteBuffers(vboId);
   }
 }

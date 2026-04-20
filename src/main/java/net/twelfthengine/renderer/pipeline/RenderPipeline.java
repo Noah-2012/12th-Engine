@@ -30,13 +30,10 @@ public class RenderPipeline {
   }
 
   public void renderFrame(RenderContext ctx) {
-    // 1️⃣ Pre-Frame Hook zuerst aufrufen (z.B. FBO binden)
     if (preFrameHook != null) preFrameHook.run();
 
-    // 2️⃣ Framebuffer klar machen
     ctx.window().clear(0f, 0f, 0f, 0.98f);
 
-    // 3️⃣ Layer in Reihenfolge rendern
     List<RenderLayer> orderedLayers = new ArrayList<>(List.of(RenderLayer.values()));
     orderedLayers.sort(Comparator.comparingInt(RenderLayer::getOrder));
 

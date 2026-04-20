@@ -12,13 +12,16 @@ public class RenderContext {
   private final Renderer2D renderer2D;
   private final Renderer3D renderer3D;
   private final LegacyRenderer legacy;
+  private final float delta;
 
-  public RenderContext(Window window, World world, Renderer2D renderer2D, Renderer3D renderer3D) {
+  public RenderContext(
+      Window window, World world, Renderer2D renderer2D, Renderer3D renderer3D, float delta) {
     this.window = window;
     this.world = world;
     this.renderer2D = renderer2D;
     this.renderer3D = renderer3D;
     this.legacy = renderer3D.getLegacy(); // derived — no extra argument needed
+    this.delta = delta;
   }
 
   public Window window() {
@@ -39,5 +42,9 @@ public class RenderContext {
 
   public LegacyRenderer legacy() {
     return legacy;
+  }
+
+  public float delta() {
+    return delta;
   }
 }

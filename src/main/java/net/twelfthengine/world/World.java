@@ -2,7 +2,9 @@ package net.twelfthengine.world;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import net.twelfthengine.coord.iab.IAB;
 import net.twelfthengine.entity.BasicEntity;
 import net.twelfthengine.entity.ModelEntity;
@@ -80,8 +82,18 @@ public class World {
   // UPDATE
   // =========================
 
+  /**
+   * Frame-rate update: entity integration, mouse/keyboard input reading (inside entity updates),
+   * and the CHEAP collisions (entity-entity, entity-plane, camera-plane / grounded).
+   *
+   * <p>Mesh-precise sphere-vs-triangle collision is NOT done here — see {@link
+   * #updateMeshCollisions(float)} for that. The mesh path is O(n² × tris) and must stay on the
+   * fixed-timestep tick to avoid tanking FPS with many entities, while everything else (including
+   * input handling inside PlayerCameraEntity.update) needs to run at frame rate so mouse look, jump
+   * edge-trigger (isKeyPressed), and camera motion don't feel capped at the tick rate.
+   */
   public void update(float deltaTime) {
-    // First update all entities normally
+    // First update all entities normally (reads input, integrates physics)
     for (BasicEntity e : entities) {
       e.update(deltaTime);
       if (e instanceof net.twelfthengine.entity.world.TextureEntity te) {
@@ -89,19 +101,162 @@ public class World {
       }
     }
 
-    // Then handle collisions
-    handleCollisions();
+    // Cheap collisions only — run every frame.
+    handleCheapCollisions();
   }
 
-  private void handleCollisions() {
+  /**
+   * Tick-rate update: runs the expensive mesh-precise sphere-vs-triangle collision resolver. This
+   * is called from the fixed-timestep accumulator in EngineBootstrap instead of per frame, because
+   * at 20+ rigid entities this scales O(n² × tris) and would otherwise dominate the frame budget.
+   *
+   * <p>Tradeoff: at very high speeds an entity could penetrate a mesh by up to {@code speed *
+   * tickTime} before being pushed out. At the default {@code moveSpeed = 14} and {@code tickRate =
+   * 20}, that's ~0.7 units — smaller than the player capsule radius × 2, so tunneling is unlikely
+   * for player-speed motion.
+   */
+  public void updateMeshCollisions(float deltaTime) {
+    handleMeshCollisions();
+  }
+
+  // =========================
+  // COLLISION — TRANSFORMED MESH CACHE
+  // =========================
+
+  /**
+   * World-space triangle data for a ModelEntity, computed once per tick and reused across every
+   * (entity, model) collision pair. Previously the entire model was re-transformed inside every
+   * iteration of every entity-vs-model call — with 15 rigid bodies and 15 models, that was on the
+   * order of half a million triangle-vertex transforms per tick (plus 6 sin/cos per vertex). Now it
+   * is computed at most once per model per tick, and only lazily (only if something actually gets
+   * close enough to clear the broad-phase).
+   */
+  private static final class TransformedMesh {
+    /** World-space triangle vertices, laid out as [v0x,v0y,v0z, v1x,v1y,v1z, v2x,v2y,v2z] × N. */
+    final float[] verts;
+
+    /** Per-triangle AABB mins, laid out as [minX,minY,minZ] × N. */
+    final float[] triMin;
+
+    /** Per-triangle AABB maxes, laid out as [maxX,maxY,maxZ] × N. */
+    final float[] triMax;
+
+    final int faceCount;
+
+    TransformedMesh(int faceCount) {
+      this.faceCount = faceCount;
+      this.verts = new float[faceCount * 9];
+      this.triMin = new float[faceCount * 3];
+      this.triMax = new float[faceCount * 3];
+    }
+  }
+
+  /**
+   * Per-tick transformed-mesh cache. Cleared at the start of each {@link #handleMeshCollisions()}
+   * and populated lazily. IdentityHashMap because keys are ModelEntity references — equality by
+   * identity is correct and faster than hash-based equals.
+   */
+  private final Map<ModelEntity, TransformedMesh> transformedMeshCache = new IdentityHashMap<>();
+
+  private TransformedMesh getOrBuildTransformedMesh(ModelEntity model, ObjModel modelData) {
+    TransformedMesh cached = transformedMeshCache.get(model);
+    if (cached != null) return cached;
+
+    int faceCount = modelData.faces.size();
+    TransformedMesh mesh = new TransformedMesh(faceCount);
+
+    // Precompute sin/cos exactly ONCE per model per tick. The previous
+    // applyTransform() computed 6 trig calls per vertex × 3 vertices × N faces ×
+    // 3 iterations × every colliding entity — easily tens of millions per second
+    // at 20 entities. This loop does 6 trig calls total.
+    Vec3 rot = model.getRotation();
+    float rx = (float) Math.toRadians(rot.x());
+    float ry = (float) Math.toRadians(rot.y());
+    float rz = (float) Math.toRadians(rot.z());
+    float cx = (float) Math.cos(rx), sx = (float) Math.sin(rx);
+    float cy = (float) Math.cos(ry), sy = (float) Math.sin(ry);
+    float cz = (float) Math.cos(rz), sz = (float) Math.sin(rz);
+
+    float s = model.getSize();
+    Vec3 modelPos = model.getPosition();
+    float px = modelPos.x(), py = modelPos.y(), pz = modelPos.z();
+
+    float[] verts = mesh.verts;
+    float[] triMin = mesh.triMin;
+    float[] triMax = mesh.triMax;
+
+    for (int f = 0; f < faceCount; f++) {
+      ObjModel.Face face = modelData.faces.get(f);
+      int baseV = f * 9;
+      int baseB = f * 3;
+
+      float tMinX = Float.POSITIVE_INFINITY,
+          tMinY = Float.POSITIVE_INFINITY,
+          tMinZ = Float.POSITIVE_INFINITY;
+      float tMaxX = Float.NEGATIVE_INFINITY,
+          tMaxY = Float.NEGATIVE_INFINITY,
+          tMaxZ = Float.NEGATIVE_INFINITY;
+
+      for (int i = 0; i < 3; i++) {
+        Vec3 v = modelData.vertices.get(face.vertexIndices[i]);
+        float vx = v.x() * s, vy = v.y() * s, vz = v.z() * s;
+
+        // Rotate X (Y,Z plane)
+        float y1 = vy * cx - vz * sx;
+        float z1 = vy * sx + vz * cx;
+        vy = y1;
+        vz = z1;
+
+        // Rotate Y (X,Z plane)
+        float x2 = vx * cy + vz * sy;
+        float z2 = -vx * sy + vz * cy;
+        vx = x2;
+        vz = z2;
+
+        // Rotate Z (X,Y plane)
+        float x3 = vx * cz - vy * sz;
+        float y3 = vx * sz + vy * cz;
+        vx = x3;
+        vy = y3;
+
+        float wx = px + vx;
+        float wy = py + vy;
+        float wz = pz + vz;
+
+        verts[baseV + i * 3] = wx;
+        verts[baseV + i * 3 + 1] = wy;
+        verts[baseV + i * 3 + 2] = wz;
+
+        if (wx < tMinX) tMinX = wx;
+        if (wy < tMinY) tMinY = wy;
+        if (wz < tMinZ) tMinZ = wz;
+        if (wx > tMaxX) tMaxX = wx;
+        if (wy > tMaxY) tMaxY = wy;
+        if (wz > tMaxZ) tMaxZ = wz;
+      }
+
+      triMin[baseB] = tMinX;
+      triMin[baseB + 1] = tMinY;
+      triMin[baseB + 2] = tMinZ;
+      triMax[baseB] = tMaxX;
+      triMax[baseB + 1] = tMaxY;
+      triMax[baseB + 2] = tMaxZ;
+    }
+
+    transformedMeshCache.put(model, mesh);
+    return mesh;
+  }
+
+  /**
+   * Cheap collisions: entity-entity, entity-plane, camera-plane (grounded). Called every frame from
+   * {@link #update(float)}. Does NOT touch mesh-precise triangle collision.
+   */
+  private void handleCheapCollisions() {
     List<BasicPlaneEntity> planes = new ArrayList<>();
-    List<ModelEntity> models = new ArrayList<>();
     for (BasicEntity entity : entities) {
       if (entity instanceof BasicPlaneEntity) {
         planes.add((BasicPlaneEntity) entity);
         ((BasicPlaneEntity) entity).render();
-      } else if (entity instanceof ModelEntity modelEntity) {
-        models.add(modelEntity);
       }
     }
 
@@ -113,7 +268,7 @@ public class World {
       }
     }
 
-    // Collide normal entities
+    // Collide normal entities against planes
     for (BasicEntity entity : entities) {
       if (entity.isRigidBodyEnabled() && !(entity instanceof BasicPlaneEntity)) {
         for (BasicPlaneEntity plane : planes) {
@@ -122,7 +277,7 @@ public class World {
       }
     }
 
-    // Collide camera
+    // Collide camera against planes (also determines grounded state)
     if (activeCamera != null && activeCamera.isRigidBodyEnabled()) {
       boolean grounded = false;
       for (BasicPlaneEntity plane : planes) {
@@ -136,12 +291,51 @@ public class World {
         playerCamera.setGrounded(grounded);
       }
     }
+  }
 
-    // Mesh precise collisions for everything against models
+  /**
+   * Expensive mesh-precise sphere-vs-triangle collisions. Called at the tick rate from {@link
+   * #updateMeshCollisions(float)}. Does the per-model world-space transform once (cached for the
+   * duration of this tick), then broad-phases every (entity, model) pair with a single dot-product
+   * before descending into the triangle loop.
+   */
+  private void handleMeshCollisions() {
+    // Per-tick state: invalidate the transformed mesh cache so moved/rotated
+    // models are re-transformed on demand.
+    transformedMeshCache.clear();
+
+    List<ModelEntity> models = new ArrayList<>();
+    for (BasicEntity entity : entities) {
+      if (entity instanceof ModelEntity modelEntity) {
+        models.add(modelEntity);
+      }
+    }
+
+    // FIX: broad-phase sphere-vs-sphere test is done HERE in the outer loop
+    //      before any per-triangle work or cache population. Most (entity,
+    //      model) pairs bail out after a single dot product.
     for (BasicEntity entity : entities) {
       if (!entity.isRigidBodyEnabled() && !(entity instanceof PlayerCameraEntity)) continue;
+
+      Vec3 entityPos = entity.getPosition();
+      float camRadius = entity.getCollisionRadius();
+      float camHalfHeight = entity.getCollisionHeight() * 0.5f;
+
       for (ModelEntity model : models) {
         if (entity == model) continue;
+
+        Vec3 modelPos = model.getPosition();
+        Vec3 modelCenterOffset = model.getModelCenter();
+        float mcx = modelPos.x() + modelCenterOffset.x();
+        float mcy = modelPos.y() + modelCenterOffset.y();
+        float mcz = modelPos.z() + modelCenterOffset.z();
+
+        float broadPhase = model.getModelBoundingRadius() + camHalfHeight + camRadius + 0.5f;
+        float dx = entityPos.x() - mcx;
+        float dy = entityPos.y() - mcy;
+        float dz = entityPos.z() - mcz;
+        if (dx * dx + dy * dy + dz * dz > broadPhase * broadPhase) continue;
+
         resolveSphereModelCollision(entity, model);
       }
     }
@@ -151,92 +345,68 @@ public class World {
     ObjModel modelData = model.getModelData();
     if (modelData == null || modelData.faces.isEmpty()) return;
 
-    Vec3 camPos = entity.getPosition();
-    Vec3 camVel = entity.getVelocity();
     float camRadius = entity.getCollisionRadius();
     float camHalfHeight = entity.getCollisionHeight() * 0.5f;
 
-    Vec3 modelPos = model.getPosition();
-    Vec3 modelCenter = modelPos.add(model.getModelCenter());
-    float modelBoundingRadius = model.getModelBoundingRadius();
-    float broadPhase = modelBoundingRadius + camHalfHeight + camRadius + 0.5f;
-    Vec3 toModel = camPos.sub(modelCenter);
-    if (toModel.dot(toModel) > broadPhase * broadPhase) return;
+    // FIX: Triangles are transformed into world-space ONCE per model per tick
+    //      (cached across iterations and across all entities) instead of being
+    //      re-transformed every iteration of every entity-model pair with six
+    //      fresh trig calls per vertex.
+    TransformedMesh mesh = getOrBuildTransformedMesh(model, modelData);
+    float[] verts = mesh.verts;
+    float[] triMin = mesh.triMin;
+    float[] triMax = mesh.triMax;
+    int faceCount = mesh.faceCount;
 
-    float camBottom = camPos.y() - camHalfHeight + camRadius;
-    float camCenterY = camPos.y();
-    float camTop = camPos.y() + camHalfHeight - camRadius;
-    Vec3[] sampleCenters = {
-      new Vec3(camPos.x(), camBottom, camPos.z()),
-      new Vec3(camPos.x(), camCenterY, camPos.z()),
-      new Vec3(camPos.x(), camTop, camPos.z()),
-    };
-
-    Vec3 rot = model.getRotation();
-    float rx = (float) Math.toRadians(rot.x());
-    float ry = (float) Math.toRadians(rot.y());
-    float rz = (float) Math.toRadians(rot.z());
+    float radiusSq = camRadius * camRadius;
 
     for (int iteration = 0; iteration < 3; iteration++) {
       boolean collided = false;
 
-      camPos = entity.getPosition();
-      sampleCenters =
-          new Vec3[] {
-            new Vec3(camPos.x(), camPos.y() - camHalfHeight + camRadius, camPos.z()),
-            new Vec3(camPos.x(), camPos.y(), camPos.z()),
-            new Vec3(camPos.x(), camPos.y() + camHalfHeight - camRadius, camPos.z()),
-          };
+      Vec3 camPos = entity.getPosition();
+      float cpx = camPos.x(), cpy = camPos.y(), cpz = camPos.z();
+      float camBottomY = cpy - camHalfHeight + camRadius;
+      float camCenterY = cpy;
+      float camTopY = cpy + camHalfHeight - camRadius;
 
-      for (ObjModel.Face face : modelData.faces) {
-        Vec3 a =
-            applyTransform(
-                modelData.vertices.get(face.vertexIndices[0]),
-                modelPos,
-                model.getSize(),
-                rx,
-                ry,
-                rz);
-        Vec3 b =
-            applyTransform(
-                modelData.vertices.get(face.vertexIndices[1]),
-                modelPos,
-                model.getSize(),
-                rx,
-                ry,
-                rz);
-        Vec3 c =
-            applyTransform(
-                modelData.vertices.get(face.vertexIndices[2]),
-                modelPos,
-                model.getSize(),
-                rx,
-                ry,
-                rz);
+      float camMinX = cpx - camRadius;
+      float camMaxX = cpx + camRadius;
+      float camMinY = cpy - camHalfHeight;
+      float camMaxY = cpy + camHalfHeight;
+      float camMinZ = cpz - camRadius;
+      float camMaxZ = cpz + camRadius;
 
-        Vec3 triMin =
-            new Vec3(
-                Math.min(a.x(), Math.min(b.x(), c.x())),
-                Math.min(a.y(), Math.min(b.y(), c.y())),
-                Math.min(a.z(), Math.min(b.z(), c.z())));
-        Vec3 triMax =
-            new Vec3(
-                Math.max(a.x(), Math.max(b.x(), c.x())),
-                Math.max(a.y(), Math.max(b.y(), c.y())),
-                Math.max(a.z(), Math.max(b.z(), c.z())));
+      for (int f = 0; f < faceCount; f++) {
+        int baseB = f * 3;
+        float tMinX = triMin[baseB];
+        float tMinY = triMin[baseB + 1];
+        float tMinZ = triMin[baseB + 2];
+        float tMaxX = triMax[baseB];
+        float tMaxY = triMax[baseB + 1];
+        float tMaxZ = triMax[baseB + 2];
 
-        Vec3 cameraMin =
-            new Vec3(camPos.x() - camRadius, camPos.y() - camHalfHeight, camPos.z() - camRadius);
-        Vec3 cameraMax =
-            new Vec3(camPos.x() + camRadius, camPos.y() + camHalfHeight, camPos.z() + camRadius);
+        // Inline AABB test — no Vec3 allocation.
+        if (camMaxX < tMinX || camMinX > tMaxX) continue;
+        if (camMaxY < tMinY || camMinY > tMaxY) continue;
+        if (camMaxZ < tMinZ || camMinZ > tMaxZ) continue;
 
-        if (!aabbIntersects(cameraMin, cameraMax, triMin, triMax)) continue;
+        int baseV = f * 9;
+        Vec3 a = new Vec3(verts[baseV], verts[baseV + 1], verts[baseV + 2]);
+        Vec3 b = new Vec3(verts[baseV + 3], verts[baseV + 4], verts[baseV + 5]);
+        Vec3 c = new Vec3(verts[baseV + 6], verts[baseV + 7], verts[baseV + 8]);
 
-        for (Vec3 sampleCenter : sampleCenters) {
+        // Test each of the three vertical samples.
+        for (int si = 0; si < 3; si++) {
+          float scy;
+          if (si == 0) scy = camBottomY;
+          else if (si == 1) scy = camCenterY;
+          else scy = camTopY;
+
+          Vec3 sampleCenter = new Vec3(cpx, scy, cpz);
           Vec3 closest = closestPointOnTriangle(sampleCenter, a, b, c);
           Vec3 delta = sampleCenter.sub(closest);
           float distSq = delta.dot(delta);
-          if (distSq < camRadius * camRadius) {
+          if (distSq < radiusSq) {
             float dist = (float) Math.sqrt(Math.max(distSq, 0.000001f));
             Vec3 normal = dist > 0.0001f ? delta.div(dist) : computeTriangleNormal(a, b, c);
             float pushOut = camRadius - dist + 0.001f;
@@ -265,15 +435,6 @@ public class World {
 
       if (!collided) break;
     }
-  }
-
-  private boolean aabbIntersects(Vec3 minA, Vec3 maxA, Vec3 minB, Vec3 maxB) {
-    return (maxA.x() >= minB.x()
-        && minA.x() <= maxB.x()
-        && maxA.y() >= minB.y()
-        && minA.y() <= maxB.y()
-        && maxA.z() >= minB.z()
-        && minA.z() <= maxB.z());
   }
 
   private Vec3 closestPointOnTriangle(Vec3 p, Vec3 a, Vec3 b, Vec3 c) {
@@ -324,29 +485,5 @@ public class World {
     Vec3 n = b.sub(a).cross(c.sub(a)).normalize();
     if (n.length() < 0.0001f) return new Vec3(1f, 0f, 0f);
     return n;
-  }
-
-  private Vec3 applyTransform(Vec3 v, Vec3 pos, float s, float rx, float ry, float rz) {
-    float vx = v.x() * s, vy = v.y() * s, vz = v.z() * s;
-
-    // Apply rotation X
-    float y1 = vy * (float) Math.cos(rx) - vz * (float) Math.sin(rx);
-    float z1 = vy * (float) Math.sin(rx) + vz * (float) Math.cos(rx);
-    vy = y1;
-    vz = z1;
-
-    // Apply rotation Y
-    float x2 = vx * (float) Math.cos(ry) + vz * (float) Math.sin(ry);
-    float z2 = -vx * (float) Math.sin(ry) + vz * (float) Math.cos(ry);
-    vx = x2;
-    vz = z2;
-
-    // Apply rotation Z
-    float x3 = vx * (float) Math.cos(rz) - vy * (float) Math.sin(rz);
-    float y3 = vx * (float) Math.sin(rz) + vy * (float) Math.cos(rz);
-    vx = x3;
-    vy = y3;
-
-    return pos.add(new Vec3(vx, vy, vz));
   }
 }

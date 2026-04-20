@@ -114,7 +114,8 @@ public class UnitCubeMesh {
     GL20.glVertexAttribPointer(0, 3, GL20.GL_FLOAT, false, stride, 0);
     GL20.glDisableVertexAttribArray(1);
     GL20.glDisableVertexAttribArray(2);
-    shader.setUniformMatrix4fv(uniformMvp, false, ShaderProgram.matrixToBuffer(lightMvp));
+    // FIX: use non-deprecated overload — no direct FloatBuffer allocation.
+    shader.setUniformMatrix4fv(uniformMvp, false, lightMvp);
     GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, VERTEX_COUNT);
     GL20.glDisableVertexAttribArray(0);
     GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
@@ -135,11 +136,11 @@ public class UnitCubeMesh {
     GL20.glEnableVertexAttribArray(2);
     GL20.glVertexAttribPointer(2, 2, GL20.GL_FLOAT, false, stride, 6L * Float.BYTES);
 
-    shader.setUniformMatrix4fv("uModel", false, ShaderProgram.matrixToBuffer(model));
-    shader.setUniformMatrix4fv("uView", false, ShaderProgram.matrixToBuffer(view));
-    shader.setUniformMatrix4fv("uProjection", false, ShaderProgram.matrixToBuffer(projection));
-    shader.setUniformMatrix4fv(
-        "uLightSpaceMatrix", false, ShaderProgram.matrixToBuffer(lightSpace));
+    // FIX: use non-deprecated overload — no direct FloatBuffer allocation.
+    shader.setUniformMatrix4fv("uModel", false, model);
+    shader.setUniformMatrix4fv("uView", false, view);
+    shader.setUniformMatrix4fv("uProjection", false, projection);
+    shader.setUniformMatrix4fv("uLightSpaceMatrix", false, lightSpace);
 
     shader.setUniform1i("uUseTexture", 0);
     shader.setUniform3f("uBaseColor", 0.7f, 0.7f, 0.7f);

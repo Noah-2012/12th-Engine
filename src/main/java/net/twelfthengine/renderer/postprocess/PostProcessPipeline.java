@@ -1,5 +1,8 @@
 package net.twelfthengine.renderer.postprocess;
 
+import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.glClear;
+
 import java.util.ArrayList;
 import java.util.List;
 import org.lwjgl.opengl.GL11;
@@ -132,7 +135,7 @@ public class PostProcessPipeline {
       //      need the depth buffer, and clearing it wastes GPU bandwidth.
       writeFbo.bind();
       GL11.glClearColor(0f, 0f, 0f, 1f);
-      GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+      glClear(GL_COLOR_BUFFER_BIT);
 
       effect.apply(readFbo.getColorTexId(), readFbo.getDepthTexId());
 
@@ -154,7 +157,7 @@ public class PostProcessPipeline {
     GL11.glViewport(0, 0, fbo.width(), fbo.height());
 
     GL11.glClearColor(0f, 0f, 0f, 1f);
-    GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
 
     GL20.glUseProgram(blitProgram);
 

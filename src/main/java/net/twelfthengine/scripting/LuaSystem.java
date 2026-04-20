@@ -1,5 +1,6 @@
 package net.twelfthengine.scripting;
 
+import net.twelfthengine.core.logger.Logger;
 import net.twelfthengine.entity.BasicEntity;
 import net.twelfthengine.world.World;
 import org.luaj.vm2.Globals;
@@ -12,15 +13,33 @@ import org.luaj.vm2.lib.jse.JsePlatform;
  * binding.
  */
 public class LuaSystem {
+
+  private static final String TAG = "LuaSystem";
   private final Globals globals;
 
   public LuaSystem(World world) {
+    Logger.info(TAG, "Initializing Lua scripting environment...");
     this.globals = JsePlatform.standardGlobals();
 
-    // 1. Bind the world instance so Lua can do world:addEntity(...)
+    // Redirect Lua's print() to our engine's Logger
+    globals.STDOUT =
+        new java.io.PrintStream(
+            new java.io.OutputStream() {
+              private StringBuilder buffer = new StringBuilder();
+
+              @Override
+              public void write(int b) {
+                if (b == '\n') {
+                  Logger.info("LUA", buffer.toString());
+                  buffer.setLength(0);
+                } else {
+                  buffer.append((char) b);
+                }
+              }
+            });
+
     bind("world", world);
 
-    // 2. Expose Class Types so Lua can call constructors (.new)
     globals.set("Vec3", CoerceJavaToLua.coerce(net.twelfthengine.math.Vec3.class));
     globals.set("ModelEntity", CoerceJavaToLua.coerce(net.twelfthengine.entity.ModelEntity.class));
     globals.set(
@@ -32,18 +51,35 @@ public class LuaSystem {
         "TextureEntity",
         CoerceJavaToLua.coerce(net.twelfthengine.entity.world.TextureEntity.class));
     globals.set("CollisionShape", CoerceJavaToLua.coerce(BasicEntity.CollisionShape.class));
-
-    // Since your bomb uses TwelfthPackage, we should expose that too if you want to keep the
-    // archive loading
     globals.set(
         "TwelfthPackage",
         CoerceJavaToLua.coerce(net.twelfthengine.core.resources.TwelfthPackage.class));
     globals.set(
         "ResourceExtractor",
         CoerceJavaToLua.coerce(net.twelfthengine.core.resources.ResourceExtractor.class));
+
+    Logger.info(TAG, "Lua environment ready.");
   }
 
-  /** Binds a Java object to a global variable name in Lua. */
+  /**
+   * Executes a raw string of Lua code. Useful for console commands or dynamic snippets.
+   *
+   * @param code The Lua code to execute.
+   */
+  public void run(String code) {
+    if (code == null || code.trim().isEmpty()) return;
+
+    try {
+      // globals.load(code) compiles the string into an executable chunk
+      LuaValue chunk = globals.load(code);
+      chunk.call();
+      Logger.debug(TAG, "Executed Lua snippet.");
+    } catch (Exception e) {
+      Logger.error(TAG, "Error executing Lua string: " + e.getMessage());
+      e.printStackTrace();
+    }
+  }
+
   public void bind(String name, Object obj) {
     if (obj == null) {
       globals.set(name, LuaValue.NIL);
@@ -52,42 +88,32 @@ public class LuaSystem {
     }
   }
 
-  /**
-   * Executes a Lua script from the resources folder.
-   *
-   * @param internalPath e.g., "scripts/init.lua"
-   */
   public void runScript(String internalPath) {
     try {
       LuaValue chunk = globals.loadfile(internalPath);
+      if (chunk == null || chunk.isnil()) return;
       chunk.call();
     } catch (Exception e) {
-      System.err.println("[LuaSystem] Error loading script: " + internalPath);
-      e.printStackTrace();
+      Logger.error(TAG, "Error executing script '" + internalPath + "': " + e.getMessage());
     }
   }
 
-  /** Calls a global Lua function (like onTick) with optional arguments. */
   public void call(String functionName, Object... args) {
     LuaValue func = globals.get(functionName);
+    if (func.isnil() || !func.isfunction()) return;
 
-    if (!func.isnil() && func.isfunction()) {
-      LuaValue[] luaArgs = new LuaValue[args.length];
-      for (int i = 0; i < args.length; i++) {
-        // We coerce every Java argument to a LuaValue
-        luaArgs[i] = CoerceJavaToLua.coerce(args[i]);
-      }
+    LuaValue[] luaArgs = new LuaValue[args.length];
+    for (int i = 0; i < args.length; i++) {
+      luaArgs[i] = CoerceJavaToLua.coerce(args[i]);
+    }
 
-      try {
-        func.invoke(luaArgs);
-      } catch (Exception e) {
-        System.err.println("[LuaSystem] Runtime error in function: " + functionName);
-        e.printStackTrace();
-      }
+    try {
+      func.invoke(luaArgs);
+    } catch (Exception e) {
+      Logger.error(TAG, "Runtime error in Lua function '" + functionName + "': " + e.getMessage());
     }
   }
 
-  /** Optional: Access the raw globals if you need custom Luaj manipulation. */
   public Globals getGlobals() {
     return globals;
   }

@@ -37,10 +37,10 @@ public class QGUIManager {
 
       // Basic Z-ordering: if a window is clicked, bring it to front
       if (mousePressed
-          && mouseX >= w.x
-          && mouseX <= w.x + w.width
-          && mouseY >= w.y
-          && mouseY <= w.y + w.height) {
+              && mouseX >= w.x
+              && mouseX <= w.x + w.width
+              && mouseY >= w.y
+              && mouseY <= w.y + w.height) {
         windows.remove(i);
         windows.add(w);
         break; // Stop routing click to windows underneath

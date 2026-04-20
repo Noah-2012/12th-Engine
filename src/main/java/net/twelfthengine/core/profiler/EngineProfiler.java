@@ -1,6 +1,7 @@
 package net.twelfthengine.core.profiler;
 
 import imgui.ImGui;
+import imgui.ImGuiStyle;
 import imgui.flag.ImGuiCol;
 import imgui.flag.ImGuiCond;
 import imgui.flag.ImGuiTreeNodeFlags;
@@ -107,6 +108,8 @@ public class EngineProfiler {
   public void render(World world, Window window, boolean paused) {
     ImGui.setNextWindowSize(420, 680, ImGuiCond.Once);
     ImGui.setNextWindowPos(10, 10, ImGuiCond.Once);
+    ImGuiStyle style = ImGui.getStyle();
+    style.setWindowRounding(10f);
     ImGui.begin("12th Engine Profiler");
 
     // ---- Performance Overview ----
